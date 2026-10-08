@@ -2,5 +2,17 @@
   "name": "@WorkOrchestrator/shared",
   "private": true,
   "version": "0.0.0",
-  "type": "module"
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./nodeRegistry": {
+      "types": "./src/registry/nodeRegistry.ts",
+      "default": "./src/registry/nodeRegistry.ts"
+    }
+  }
 }
