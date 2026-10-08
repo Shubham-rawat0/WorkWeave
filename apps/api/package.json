@@ -5,12 +5,17 @@
   "version": "0.0.0",
   "private": true,
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "hono": "^4.13.13"
+    "@WorkOrchestrator/prisma": "workspace:*",
+    "@hono/zod-validator": "^0.9.1",
+    "bcrypt": "^6.0.0",
+    "hono": "^4.13.13",
+    "zod": "^4.6.5"
   }
 }
