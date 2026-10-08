@@ -1,0 +1,16 @@
+{
+  "name": "@WorkOrchestrator/api",
+  "module": "index.ts",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.13.13"
+  }
+}
