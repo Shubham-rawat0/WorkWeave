@@ -1,0 +1,14 @@
+{
+  "extends": "@WorkOrchestrator/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "lib": ["esnext", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "plugins": [{ "name": "next" }],
+    "types": ["node"]
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

@@ -59,6 +59,46 @@ async function deleteSessionByToken(token: string): Promise<void> {
     });
 }
 
+const sessionUserSelect = {
+    id: true,
+    name: true,
+    email: true,
+    image: true,
+    provider: true,
+} as const;
+
+export async function getSessionUser(c: Context) {
+    const token = getSessionCookie(c);
+
+    if (!token) {
+        return null;
+    }
+
+    const session = await prisma.session.findUnique({
+        where: {
+            hashToken: getHashToken(token),
+        },
+        select: {
+            expiresAt: true,
+            user: {
+                select: sessionUserSelect,
+            },
+        },
+    });
+
+    if (!session) {
+        return null;
+    }
+
+    if (session.expiresAt.getTime() <= Date.now()) {
+        await deleteSessionByToken(token);
+        clearSessionCookie(c);
+        return null;
+    }
+
+    return session.user;
+}
+
 export async function createSession(
     c: Context,
     userId: string,

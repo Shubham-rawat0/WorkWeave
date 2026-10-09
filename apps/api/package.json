@@ -16,6 +16,7 @@
     "@WorkOrchestrator/prisma": "workspace:*",
     "@hono/zod-validator": "^0.9.1",
     "bcrypt": "^6.0.0",
+    "google-auth-library": "^11.2.0",
     "hono": "^4.13.13",
     "zod": "^4.6.5"
   }

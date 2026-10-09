@@ -1,9 +1,18 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import auth from "./routes/auth"
 
 export const app=new Hono()
+
+app.use(
+    "*",
+    cors({
+        origin: process.env.WEB_APP_URL ?? "http://localhost:3000",
+        credentials: true,
+    }),
+);
 
 app.onError((err, c) => {
     if (err instanceof HTTPException) {
