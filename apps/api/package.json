@@ -6,7 +6,8 @@
   "private": true,
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/node": "^26.6.4"
   },
   "peerDependencies": {
     "typescript": "^5"
