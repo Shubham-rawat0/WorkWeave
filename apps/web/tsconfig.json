@@ -1,7 +1,6 @@
 {
   "extends": "@WorkOrchestrator/typescript-config/nextjs.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "lib": ["esnext", "DOM", "DOM.Iterable"],
     "paths": {
       "@/*": ["./src/*"]
