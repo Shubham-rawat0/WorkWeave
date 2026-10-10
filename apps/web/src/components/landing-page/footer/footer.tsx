@@ -1,8 +1,8 @@
-
 "use client";
 
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import { ChevronDown, Workflow } from "lucide-react";
+import WLogo from "@/components/landing-page/header/w-logo";
 
 const Collapsible = CollapsiblePrimitive.Root;
 const CollapsibleTrigger = CollapsiblePrimitive.CollapsibleTrigger;
@@ -29,19 +29,13 @@ const footerGroups = [
 
 function BrandMark() {
   return (
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#F04D26] text-xl font-black text-white shadow-sm shadow-[#F04D26]/20">
-      W
+    <span className="flex size-10 shrink-0 items-center justify-center">
+      <WLogo className="size-10" />
     </span>
   );
 }
 
-function FooterGroup({
-  title,
-  items,
-}: {
-  title: string;
-  items: string[];
-}) {
+function FooterGroup({ title, items }: { title: string; items: string[] }) {
   return (
     <div className="min-w-0">
       <h3 className="mb-5 text-sm font-semibold tracking-wide text-[var(--surface-text)]">
@@ -114,12 +108,8 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="relative overflow-hidden pt-12 sm:pt-16">
-      {/* Top border */}
+    <footer className="relative overflow-hidden border-t border-white/[0.06] pt-12 sm:pt-16">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="h-px w-full bg-[var(--surface-text)]/10" />
-
-        {/* Main footer */}
         <div className="grid gap-12 py-12 lg:grid-cols-[1.1fr_2fr] lg:gap-16 lg:py-16">
           {/* Brand section */}
           <div className="flex flex-col items-start">

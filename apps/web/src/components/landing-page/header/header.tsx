@@ -104,7 +104,7 @@ export default function Header() {
 
         <SideLine side="left" />
 
-        <header className="pointer-events-auto relative z-10 flex h-16 w-full max-w-[calc(100vw-1.5rem)] items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[var(--surface)] px-3 text-[var(--surface-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_32px_rgba(0,0,0,0.35)] sm:w-[90%] md:w-[85%] md:shadow-lg md:shadow-black/20 lg:h-auto lg:w-auto lg:rounded-[20px] lg:p-2">
+        <header className="pointer-events-auto relative z-10 flex h-16 w-full max-w-[calc(100vw-1.5rem)] items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[var(--surface)]/35 px-3 text-[var(--surface-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-2xl backdrop-saturate-150 supports-[not(backdrop-filter)]:bg-[var(--surface)]/90 sm:w-[90%] md:w-[85%] md:shadow-lg md:shadow-black/20 lg:h-auto lg:w-auto lg:rounded-[20px] lg:p-2">
           {/* Logo */}
           <Link
             href="/"

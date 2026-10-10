@@ -6,17 +6,15 @@ export function HeroContent() {
           <div className="text-center md:text-left mt-0 sm:mt-2 md:mt-0 lg:mt-7 xl:mt-8 2xl:mt-9">
             <h1 className="font-serif text-2xl sm:text-2xl md:text-[26px] lg:text-[40px] xl:text-[45px] min-[97.5rem]:text-[50px] leading-tight lg:leading-[1.08] tracking-tight text-white mb-6 md:mb-8">
               <span className="block 2xl:whitespace-nowrap">
-                Your workflows aren&apos;t linear.
+               Complex workflows. 
               </span>
               <span className="block 2xl:whitespace-nowrap">
-                Your engine shouldn&apos;t be either.
+                Reliable execution.
               </span>
             </h1>
 
             <p className="max-w-xl 2xl:max-w-2xl mx-auto md:mx-0 text-sm lg:text-[17px] xl:text-[14px] 2xl:text-[18px] min-[97.5rem]:text-[18px] text-[#A1A1AA] mb-10 md:mb-10 leading-relaxed font-sans">
-              A graph-based workflow engine with node-level retries,
-              checkpointing, and crash-safe execution built for production
-              systems.
+             Orchestrate tasks with built-in retries, checkpointing, and fault-tolerant execution.
             </p>
           </div>
 
