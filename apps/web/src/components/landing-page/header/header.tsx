@@ -8,7 +8,7 @@ import WLogo from "./w-logo";
 const NAV_ITEMS = [
   { label: "Features", id: "features" },
   { label: "Playground", id: "playground" },
-  { label: "Templates", id: "templates" },
+  { label: "About", id: "about" },
 ];
 
 const EASE = [0.23, 1, 0.32, 1] as const;
@@ -45,12 +45,6 @@ const handleSmoothScroll = (
   }
   element.scrollIntoView({ behavior: "smooth", block: "start" });
 };
-
-const NodeSvg = () => (
-  <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
-    <rect x="0.5" y="0.5" width="8" height="8" rx="2" fill="#F04D26" />
-  </svg>
-);
 
 export default function Header() {
   const [hovered, setHovered] = useState<string | null>(null);
@@ -92,22 +86,20 @@ export default function Header() {
     // so the transparent strip around it never blocks the page underneath.
     <div className="pointer-events-none sticky top-0 z-50 flex flex-col items-center pt-2 md:pt-3">
       <div className="relative flex w-full items-center justify-center gap-6 px-3 lg:gap-8 lg:px-0">
-        <div className="pointer-events-none absolute inset-0 mx-auto hidden w-[80%] max-w-[1920px] lg:block">
-          <div className="absolute left-2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2">
-            <NodeSvg />
-          </div>
-          <div className="absolute right-2 top-1/2 z-30 translate-x-1/2 -translate-y-1/2">
-            <NodeSvg />
-          </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-1/2 hidden w-[80%] max-w-[1920px] -translate-x-1/2 lg:block"
+        >
+          <span className="absolute left-0 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F04D26] shadow-[0_0_10px_rgba(240,77,38,0.55)]" />
+          <span className="absolute right-0 top-1/2 size-2 translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F04D26] shadow-[0_0_10px_rgba(240,77,38,0.55)]" />
         </div>
-
         <SideLine side="left" />
 
-        <header className="pointer-events-auto relative z-10 flex h-16 w-full max-w-[calc(100vw-1.5rem)] items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[var(--surface)]/35 px-3 text-[var(--surface-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-2xl backdrop-saturate-150 supports-[not(backdrop-filter)]:bg-[var(--surface)]/90 sm:w-[90%] md:w-[85%] md:shadow-lg md:shadow-black/20 lg:h-auto lg:w-auto lg:rounded-[20px] lg:p-2">
+        <header className="liquid-glass-header pointer-events-auto relative z-10 flex h-16 w-full max-w-[calc(100vw-1.5rem)] items-center justify-between gap-3 rounded-2xl border px-3 text-[var(--surface-text)] sm:w-[90%] md:w-[85%] lg:h-auto lg:w-auto lg:rounded-[20px] lg:p-2">
           {/* Logo */}
           <Link
             href="/"
-            aria-label="WorkOrchestrator home"
+            aria-label="WorkWeave home"
             className="group flex shrink-0 items-center rounded-xl pl-1 pr-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F04D26] lg:pl-1.5"
           >
             <WLogo className="h-10 w-10" />
@@ -148,17 +140,6 @@ export default function Header() {
                     />
                   )}
                   <span className="relative">{item.label}</span>
-                  {isActive && (
-                    <motion.span
-                      layoutId="nav-active"
-                      className="absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[#F04D26]"
-                      transition={{
-                        type: "spring",
-                        stiffness: 500,
-                        damping: 38,
-                      }}
-                    />
-                  )}
                 </Link>
               );
             })}
@@ -256,9 +237,6 @@ export default function Header() {
                     }`}
                   >
                     {item.label}
-                    {active === item.id && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#F04D26]" />
-                    )}
                   </Link>
                 ))}
               </motion.nav>

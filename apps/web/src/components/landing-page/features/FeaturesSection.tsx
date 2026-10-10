@@ -128,9 +128,9 @@ export function FeaturesSection() {
     >
       {/* ── Section header ─────────────────────────────────────────── */}
       <div className="mx-auto w-[90%] sm:w-[88%] md:w-[85%] lg:w-[80%] max-w-[1400px] px-4 sm:px-4 md:px-5 lg:px-6 xl:px-8">
-        <div className="mb-10 sm:mb-12 md:mb-14">
+        <div className="mb-10 sm:mb-12 md:mb-14 text-center">
           {/* Eyebrow */}
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-4 flex flex-row items-center justify-center gap-2">
             <span
               className="inline-flex h-6 items-center rounded-md border border-[#F04D26]/40 bg-[#F04D26]/8 px-2 text-[10px] font-semibold tracking-widest text-[#F04D26]/80"
               aria-label="Section: Features"
@@ -139,10 +139,10 @@ export function FeaturesSection() {
             </span>
           </div>
 
-          <h2 className="font-serif text-2xl sm:text-3xl md:text-[32px] lg:text-[40px] xl:text-[44px] leading-tight tracking-tight text-white max-w-2xl">
+          <h2 className="mx-auto max-w-3xl font-serif text-3xl sm:text-4xl md:text-[42px] lg:text-[52px] xl:text-[58px] font-normal leading-[1.08] tracking-tight text-white text-balance">
             Everything you need to run reliable workflows.
           </h2>
-          <p className="mt-4 max-w-xl text-sm sm:text-base lg:text-[15px] text-[#7D7D87] leading-relaxed font-sans">
+          <p className="mx-auto mt-4 max-w-xl text-sm sm:text-base lg:text-[15px] text-[#7D7D87] leading-relaxed font-sans">
             Build, execute, and monitor automated workflows with the tools to handle branching logic, failures, and long-running tasks.
           </p>
         </div>
@@ -151,7 +151,7 @@ export function FeaturesSection() {
         <div
           role="tablist"
           aria-label="Feature slides"
-          className="mb-8 sm:mb-10 flex flex-wrap gap-1 sm:gap-2 border-b border-[#252525]"
+          className="mb-8 sm:mb-10 flex flex-wrap justify-center gap-1 sm:gap-2 border-b border-[#252525]"
         >
           {SLIDES.map((s, i) => {
             const isActive = i === active;
@@ -211,7 +211,7 @@ export function FeaturesSection() {
             >
               {/* Left: text */}
               <div className="flex flex-col justify-start md:pt-2">
-                <h3 className="text-xl sm:text-2xl lg:text-[26px] xl:text-[28px] font-semibold text-white leading-snug tracking-tight mb-4">
+                <h3 className="font-serif text-2xl sm:text-3xl lg:text-[34px] xl:text-[38px] font-normal text-white leading-[1.1] tracking-tight mb-4">
                   {slide.heading}
                 </h3>
                 <p className="text-sm sm:text-[15px] lg:text-base text-[#8a8a87] leading-relaxed mb-6 max-w-md">

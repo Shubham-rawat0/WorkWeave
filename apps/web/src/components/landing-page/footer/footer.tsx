@@ -115,13 +115,13 @@ export function Footer() {
           <div className="flex flex-col items-start">
             <a
               href=""
-              aria-label="WorkOrchestrator"
+              aria-label="WorkWeave"
               className="group inline-flex items-center gap-3"
             >
               <BrandMark />
 
               <span className="text-lg font-bold tracking-tight text-[var(--surface-text)]">
-                WorkOrchestrator
+WorkWeave
               </span>
             </a>
 
@@ -164,7 +164,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="flex flex-col gap-4 border-t border-[var(--surface-text)]/10 py-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-[var(--nav-text)]">
-            © {currentYear} WorkOrchestrator. All rights reserved.
+            © {currentYear} WorkWeave. All rights reserved.
           </p>
 
           <div className="flex items-center gap-2 text-xs text-[var(--nav-text)]">
