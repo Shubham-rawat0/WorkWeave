@@ -1,88 +1,100 @@
 "use client";
 
-import { type SyntheticEvent, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GOOGLE_AUTH_URL, api } from "@/lib/api";
+import { api } from "@/lib/api";
+import {
+  AuthInput,
+  AuthLayout,
+  Divider,
+  ErrorBanner,
+  FooterDisclaimer,
+  OAuthButton,
+  PrimaryButton,
+} from "@/components/auth/AuthShell";
 
-export default function LoginPage() {
-    const router = useRouter();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
+export default function SignInPage() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-    async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
-        event.preventDefault();
-        setError(null);
-        setLoading(true);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isLoading) return;
 
-        try {
-            await api.signin({ email, password });
-            router.push("/");
-            router.refresh();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Sign in failed");
-        } finally {
-            setLoading(false);
-        }
+    setError(null);
+    setIsLoading(true);
+
+    const formData = new FormData(event.currentTarget);
+
+    try {
+      await api.signin({
+        email: String(formData.get("email") ?? ""),
+        password: String(formData.get("password") ?? ""),
+      });
+      router.push("/home");
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Invalid email or password.",
+      );
+    } finally {
+      setIsLoading(false);
     }
+  }
 
-    return (
-        <main className="container">
-            <div className="card">
-                <h1>Welcome back</h1>
-                <p className="subtitle">Sign in to your account</p>
+  return (
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Sign in to access your workflows"
+      footer={
+        <>
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-[#F04D26] transition-colors hover:text-[#E63D00]"
+          >
+            Create one
+          </Link>
+        </>
+      }
+    >
+      <OAuthButton />
 
-                {error && <div className="alert alert-error">{error}</div>}
+      <Divider />
 
-                <form onSubmit={handleSubmit}>
-                    <div className="field">
-                        <label htmlFor="email">Email</label>
-                        <input
-                            id="email"
-                            type="email"
-                            autoComplete="email"
-                            required
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
-                        />
-                    </div>
+      {error && <ErrorBanner message={error} />}
 
-                    <div className="field">
-                        <label htmlFor="password">Password</label>
-                        <input
-                            id="password"
-                            type="password"
-                            autoComplete="current-password"
-                            required
-                            value={password}
-                            onChange={(event) =>
-                                setPassword(event.target.value)
-                            }
-                        />
-                    </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <AuthInput
+          label="Email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          inputMode="email"
+          required
+        />
 
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={loading}
-                    >
-                        {loading ? "Signing in…" : "Sign in"}
-                    </button>
-                </form>
+        <div className="space-y-2">
+          <AuthInput
+            label="Password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            required
+          />
+        </div>
 
-                <div className="divider">or</div>
+        <PrimaryButton type="submit" isLoading={isLoading}>
+          Continue
+        </PrimaryButton>
+      </form>
 
-                <a className="btn btn-google" href={GOOGLE_AUTH_URL}>
-                    Continue with Google
-                </a>
-
-                <p className="footer-text">
-                    Don&apos;t have an account?{" "}
-                    <Link href="/register">Create one</Link>
-                </p>
-            </div>
-        </main>
-    );
+      <FooterDisclaimer />
+    </AuthLayout>
+  );
 }

@@ -1,101 +1,120 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GOOGLE_AUTH_URL, api } from "@/lib/api";
+import { api } from "@/lib/api";
+import {
+  AuthInput,
+  AuthLayout,
+  Divider,
+  ErrorBanner,
+  FooterDisclaimer,
+  OAuthButton,
+  PrimaryButton,
+} from "@/components/auth/AuthShell";
 
-export default function RegisterPage() {
-    const router = useRouter();
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
+export default function SignUpPage() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        setError(null);
-        setLoading(true);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isLoading) return;
 
-        try {
-            await api.signup({ name, email, password });
-            router.push("/");
-            router.refresh();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Sign up failed");
-        } finally {
-            setLoading(false);
-        }
+    setError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("name") ?? "").trim();
+    const email = String(formData.get("email") ?? "")
+      .trim()
+      .toLowerCase();
+    const password = String(formData.get("password") ?? "");
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
     }
 
-    return (
-        <main className="container">
-            <div className="card">
-                <h1>Create an account</h1>
-                <p className="subtitle">Start orchestrating your workflows</p>
+    setIsLoading(true);
 
-                {error && <div className="alert alert-error">{error}</div>}
+    try {
+      await api.signup({ name, email, password });
+      router.push("/home");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign up failed.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
-                <form onSubmit={handleSubmit}>
-                    <div className="field">
-                        <label htmlFor="name">Name</label>
-                        <input
-                            id="name"
-                            type="text"
-                            autoComplete="name"
-                            required
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                        />
-                    </div>
+  return (
+    <AuthLayout
+      title="Create your account"
+      subtitle="Start building powerful workflow automations"
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="font-medium text-[#F04D26] transition-colors hover:text-[#E63D00]"
+          >
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <OAuthButton />
 
-                    <div className="field">
-                        <label htmlFor="email">Email</label>
-                        <input
-                            id="email"
-                            type="email"
-                            autoComplete="email"
-                            required
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
-                        />
-                    </div>
+      <Divider />
 
-                    <div className="field">
-                        <label htmlFor="password">Password</label>
-                        <input
-                            id="password"
-                            type="password"
-                            autoComplete="new-password"
-                            required
-                            minLength={8}
-                            value={password}
-                            onChange={(event) =>
-                                setPassword(event.target.value)
-                            }
-                        />
-                    </div>
+      {error && <ErrorBanner message={error} />}
 
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={loading}
-                    >
-                        {loading ? "Creating account…" : "Create account"}
-                    </button>
-                </form>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <AuthInput
+          label="Full name"
+          name="name"
+          type="text"
+          autoComplete="name"
+          placeholder="Enter your full name"
+          maxLength={100}
+          required
+        />
 
-                <div className="divider">or</div>
+        <AuthInput
+          label="Email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          inputMode="email"
+          required
+        />
 
-                <a className="btn btn-google" href={GOOGLE_AUTH_URL}>
-                    Continue with Google
-                </a>
+        <div className="space-y-1.5">
+          <AuthInput
+            label="Password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
+            minLength={8}
+            required
+          />
+          <p className="pl-1 text-xs text-[#87867c]">
+            Must be at least 8 characters
+          </p>
+        </div>
 
-                <p className="footer-text">
-                    Already have an account? <Link href="/login">Sign in</Link>
-                </p>
-            </div>
-        </main>
-    );
+        <PrimaryButton type="submit" isLoading={isLoading}>
+          Create account
+        </PrimaryButton>
+      </form>
+
+      <FooterDisclaimer />
+    </AuthLayout>
+  );
 }

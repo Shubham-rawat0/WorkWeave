@@ -9,7 +9,6 @@ const NAV_ITEMS = [
   { label: "Features", id: "features" },
   { label: "Playground", id: "playground" },
   { label: "Templates", id: "templates" },
-  { label: "Pricing", id: "pricing" },
 ];
 
 const EASE = [0.23, 1, 0.32, 1] as const;

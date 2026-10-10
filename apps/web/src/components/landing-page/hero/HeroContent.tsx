@@ -1,3 +1,5 @@
+import { WorkflowGraph } from "./WorkflowGraph";
+
 export function HeroContent() {
   return (
     <div className="relative z-10 mx-auto w-full sm:w-[88%] md:w-[85%] lg:w-[80%] xl:w-[80%] max-w-[1920px] md:overflow-x-hidden overflow-y-visible min-[120rem]:overflow-visible px-4 sm:px-4 md:px-5 lg:px-6 xl:px-8 2xl:px-10 min-[97.5rem]:px-12">
@@ -6,7 +8,7 @@ export function HeroContent() {
           <div className="text-center md:text-left mt-0 sm:mt-2 md:mt-0 lg:mt-7 xl:mt-8 2xl:mt-9">
             <h1 className="font-serif text-2xl sm:text-2xl md:text-[26px] lg:text-[40px] xl:text-[45px] min-[97.5rem]:text-[50px] leading-tight lg:leading-[1.08] tracking-tight text-white mb-6 md:mb-8">
               <span className="block 2xl:whitespace-nowrap">
-               Complex workflows. 
+               Complex workflows.{" "}
               </span>
               <span className="block 2xl:whitespace-nowrap">
                 Reliable execution.
@@ -18,8 +20,13 @@ export function HeroContent() {
             </p>
           </div>
 
-          <div className="relative mx-auto md:hidden w-full max-w-[420px] h-[220px] sm:h-[250px] mb-12 sm:mb-10 overflow-visible">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-[0.42] sm:scale-[0.4]">
+          {/* Mobile workflow graph */}
+          <div className="relative mx-auto md:hidden w-full max-w-[480px] mb-10 sm:mb-8">
+            <div
+              className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-3"
+              style={{ aspectRatio: "560 / 420" }}
+            >
+              <WorkflowGraph />
             </div>
           </div>
 
@@ -46,7 +53,14 @@ export function HeroContent() {
           </div>
         </div>
 
-        <div className="relative hidden md:block perspective-[2000px] -mt-4 md:mt-9.5 lg:mt-7 md:ml-0 xl:ml-14 min-[97.5rem]:ml-0 z-10">
+        {/* Desktop workflow graph */}
+        <div className="relative hidden md:flex items-start justify-center perspective-[2000px] -mt-4 md:mt-9.5 lg:mt-7 md:ml-0 xl:ml-14 min-[97.5rem]:ml-0 z-10">
+          <div
+            className="w-full rounded-2xl border border-[#272727] bg-[#1a1a1a] p-5 xl:p-6 shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
+            style={{ aspectRatio: "560 / 420" }}
+          >
+            <WorkflowGraph />
+          </div>
         </div>
       </div>
     </div>
