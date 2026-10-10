@@ -6,10 +6,6 @@ import type {
 import WLogo from "@/components/landing-page/header/w-logo";
 import { GOOGLE_AUTH_URL } from "@/lib/api";
 
-// ---------------------------------------------------------------------------
-// Shared auth page chrome, styled to match the landing page design system
-// (dark charcoal panels, #272727 borders, muted warm-gray text, brand orange).
-// ---------------------------------------------------------------------------
 
 interface AuthLayoutProps {
   title: string;

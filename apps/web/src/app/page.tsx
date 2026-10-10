@@ -16,8 +16,12 @@ function Home() {
 
           <div className="snap-y snap-mandatory">
             <FeaturesSection />
-
-
+            {/* todo 
+            
+            background
+            
+            palyground
+            */}
           </div>
 
         </div>

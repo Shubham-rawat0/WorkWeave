@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
+import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import {
   Webhook,
   ShieldCheck,
@@ -12,57 +13,54 @@ import {
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Design tokens (matching the project palette)
+// Design tokens
 // ---------------------------------------------------------------------------
 const C = {
-  bg: "#1a1a1a",
   nodeBg: "#222222",
   nodeBorder: "#333333",
-  nodeActiveBorder: "#6b7c6b",  // sage-green tint
-  nodeActiveGlow: "rgba(107,124,107,0.18)",
-  nodeCompleteBorder: "#7c8c7c",
-  nodeDoneGlow: "rgba(100,140,100,0.22)",
-  label: "#c9c9c5",             // off-white
-  sublabel: "#6b6b68",          // muted warm-gray
+  nodeActiveBorder: "#c4a96b",
+  nodeCompleteBorder: "#4f6f4f",
+  glow: "rgba(196,169,107,0.22)",
+  label: "#d6d6d2",
+  labelIdle: "#8a8a87",
+  sublabel: "#6b6b68",
   connector: "#3a3a38",
-  dot: "#c4a96b",               // warm amber
-  dotComplete: "#7cb87c",       // sage green
+  dot: "#c4a96b",
+  lineDone: "#5f8f5f",
+  green: "#7cb87c",
   iconIdle: "#5a5a57",
-  iconActive: "#b0b89e",        // sage
+  iconActive: "#e0c98a",
   iconComplete: "#7cb87c",
+  chipIdle: "#2b2b29",
+  chipActive: "rgba(196,169,107,0.16)",
+  chipComplete: "rgba(124,184,124,0.14)",
 } as const;
 
 // ---------------------------------------------------------------------------
-// Layout constants – all positions are in a 560 × 380 viewBox
+// Layout – 800 × 700 viewBox (previously 560 × 420)
 // ---------------------------------------------------------------------------
-const VW = 560;
-const VH = 420;
+const VW = 800;
+const VH = 700;
 
-// Node dimensions
-const NW = 138; // node width
-const NH = 46;  // node height
-const NR = 8;   // corner radius
+const NW = 216; // node width
+const NH = 64; // node height
+const NR = 14; // corner radius
 
-// Vertical lanes
-const ROW1 = 50;    // trigger
-const ROW2 = 140;   // validate
-const ROW3 = 230;   // condition
-const ROW4 = 320;   // parallel branches
-const ROW5 = 320;
-const ROW_MERGE = 320;
-const ROW_DONE = 410 - NH;  // near bottom
+const Y = {
+  trigger: 50,
+  validate: 165,
+  condition: 280,
+  branch: 410,
+  merge: 525,
+  done: 640,
+} as const;
 
-// Horizontal centres
-const CX_MAIN = VW / 2;       // 280 – main column
-const CX_LEFT = 145;          // left branch
-const CX_RIGHT = 415;         // right branch
-
-// Derived top-left corners
-function nodeX(cx: number) { return cx - NW / 2; }
-function nodeY(cy: number) { return cy - NH / 2; }
+const CX_MAIN = VW / 2;
+const CX_LEFT = 190;
+const CX_RIGHT = VW - 190;
 
 // ---------------------------------------------------------------------------
-// Node definitions
+// Nodes
 // ---------------------------------------------------------------------------
 type NodeId =
   | "trigger"
@@ -83,470 +81,437 @@ interface NodeDef {
 }
 
 const NODES: NodeDef[] = [
-  {
-    id: "trigger",
-    label: "Webhook",
-    sublabel: "POST /trigger",
-    cx: CX_MAIN,
-    cy: ROW1,
-    Icon: Webhook,
-  },
-  {
-    id: "validate",
-    label: "Validate Request",
-    sublabel: "Schema · Auth",
-    cx: CX_MAIN,
-    cy: ROW2,
-    Icon: ShieldCheck,
-  },
-  {
-    id: "condition",
-    label: "Condition",
-    sublabel: "Route by type",
-    cx: CX_MAIN,
-    cy: ROW3,
-    Icon: GitBranch,
-  },
-  {
-    id: "taskA",
-    label: "Sync Database",
-    sublabel: "Write records",
-    cx: CX_LEFT,
-    cy: ROW4,
-    Icon: Database,
-  },
-  {
-    id: "taskB",
-    label: "Notify API",
-    sublabel: "Send webhook",
-    cx: CX_RIGHT,
-    cy: ROW5,
-    Icon: Globe,
-  },
-  {
-    id: "merge",
-    label: "Merge Results",
-    sublabel: "Collect outputs",
-    cx: CX_MAIN,
-    cy: ROW_MERGE,
-    Icon: GitMerge,
-  },
-  {
-    id: "done",
-    label: "Completed",
-    sublabel: "Run finished",
-    cx: CX_MAIN,
-    cy: ROW_DONE,
-    Icon: CheckCircle,
-  },
+  { id: "trigger", label: "Webhook", sublabel: "POST /trigger", cx: CX_MAIN, cy: Y.trigger, Icon: Webhook },
+  { id: "validate", label: "Validate Request", sublabel: "Schema · Auth", cx: CX_MAIN, cy: Y.validate, Icon: ShieldCheck },
+  { id: "condition", label: "Condition", sublabel: "Route by type", cx: CX_MAIN, cy: Y.condition, Icon: GitBranch },
+  { id: "taskA", label: "Sync Database", sublabel: "Write records", cx: CX_LEFT, cy: Y.branch, Icon: Database },
+  { id: "taskB", label: "Notify API", sublabel: "Send webhook", cx: CX_RIGHT, cy: Y.branch, Icon: Globe },
+  { id: "merge", label: "Merge Results", sublabel: "Collect outputs", cx: CX_MAIN, cy: Y.merge, Icon: GitMerge },
+  { id: "done", label: "Completed", sublabel: "Run finished", cx: CX_MAIN, cy: Y.done, Icon: CheckCircle },
 ];
 
-// ---------------------------------------------------------------------------
-// Connector path helpers
-// ---------------------------------------------------------------------------
-// Simple vertical drop with gentle curve
-function vPath(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-): string {
-  const mid = (y1 + y2) / 2;
-  return `M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`;
-}
+const NODE_BY_ID = Object.fromEntries(NODES.map((n) => [n.id, n])) as Record<
+  NodeId,
+  NodeDef
+>;
 
-// For branch connectors we need a stronger curve
-function branchPath(
-  fromCx: number,
-  fromBottomY: number,
-  toCx: number,
-  toTopY: number,
-): string {
-  const cp1y = fromBottomY + 32;
-  const cp2y = toTopY - 32;
-  return `M ${fromCx} ${fromBottomY} C ${fromCx} ${cp1y}, ${toCx} ${cp2y}, ${toCx} ${toTopY}`;
-}
+// ---------------------------------------------------------------------------
+// Connectors – each ends 6px above the target so an arrowhead can sit on top
+// ---------------------------------------------------------------------------
+const ARROW = 6;
 
 interface ConnectorDef {
   id: string;
-  d: string;
   from: NodeId;
   to: NodeId;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number; // node top edge (arrow tip)
+  d: string;
+}
+
+function makeConnector(from: NodeId, to: NodeId): ConnectorDef {
+  const a = NODE_BY_ID[from];
+  const b = NODE_BY_ID[to];
+  const x1 = a.cx;
+  const y1 = a.cy + NH / 2;
+  const x2 = b.cx;
+  const y2 = b.cy - NH / 2;
+  const endY = y2 - ARROW;
+  const k = Math.max(28, (endY - y1) * 0.5);
+  return {
+    id: `${from}-${to}`,
+    from,
+    to,
+    x1,
+    y1,
+    x2,
+    y2,
+    d: `M ${x1} ${y1} C ${x1} ${y1 + k}, ${x2} ${endY - k}, ${x2} ${endY}`,
+  };
 }
 
 const CONNECTORS: ConnectorDef[] = [
-  {
-    id: "trigger-validate",
-    from: "trigger",
-    to: "validate",
-    d: vPath(CX_MAIN, ROW1 + NH / 2, CX_MAIN, ROW2 - NH / 2),
-  },
-  {
-    id: "validate-condition",
-    from: "validate",
-    to: "condition",
-    d: vPath(CX_MAIN, ROW2 + NH / 2, CX_MAIN, ROW3 - NH / 2),
-  },
-  {
-    id: "condition-taskA",
-    from: "condition",
-    to: "taskA",
-    d: branchPath(CX_MAIN, ROW3 + NH / 2, CX_LEFT, ROW4 - NH / 2),
-  },
-  {
-    id: "condition-taskB",
-    from: "condition",
-    to: "taskB",
-    d: branchPath(CX_MAIN, ROW3 + NH / 2, CX_RIGHT, ROW5 - NH / 2),
-  },
-  {
-    id: "taskA-merge",
-    from: "taskA",
-    to: "merge",
-    d: branchPath(CX_LEFT, ROW4 + NH / 2, CX_MAIN, ROW_MERGE - NH / 2),
-  },
-  {
-    id: "taskB-merge",
-    from: "taskB",
-    to: "merge",
-    d: branchPath(CX_RIGHT, ROW5 + NH / 2, CX_MAIN, ROW_MERGE - NH / 2),
-  },
-  {
-    id: "merge-done",
-    from: "merge",
-    to: "done",
-    d: vPath(CX_MAIN, ROW_MERGE + NH / 2, CX_MAIN, ROW_DONE - NH / 2),
-  },
+  makeConnector("trigger", "validate"),
+  makeConnector("validate", "condition"),
+  makeConnector("condition", "taskA"),
+  makeConnector("condition", "taskB"),
+  makeConnector("taskA", "merge"),
+  makeConnector("taskB", "merge"),
+  makeConnector("merge", "done"),
 ];
 
 // ---------------------------------------------------------------------------
-// Animation state machine
+// Timeline
 // ---------------------------------------------------------------------------
-// Each "step" defines which nodes are active/complete and which connector
-// has a moving dot (and where along it: 0→1).
-type NodeState = "idle" | "active" | "complete";
-
 interface AnimStep {
-  /** nodes that should appear active during this step */
   activeNodes: NodeId[];
-  /** nodes that are already completed */
   completeNodes: NodeId[];
-  /** which connector the dot travels along (null = no dot visible) */
-  connector: string | null;
-  /** duration of this step in ms */
+  /** connectors with a dot travelling along them during this step */
+  connectors: string[];
   duration: number;
 }
 
+const ALL: NodeId[] = ["trigger", "validate", "condition", "taskA", "taskB", "merge", "done"];
+
 const STEPS: AnimStep[] = [
-  // 0 – idle / reset
-  { activeNodes: [], completeNodes: [], connector: null, duration: 900 },
-  // 1 – trigger activates
-  { activeNodes: ["trigger"], completeNodes: [], connector: null, duration: 600 },
-  // 2 – dot travels trigger → validate
-  { activeNodes: ["trigger"], completeNodes: [], connector: "trigger-validate", duration: 700 },
-  // 3 – validate activates, trigger done
-  { activeNodes: ["validate"], completeNodes: ["trigger"], connector: null, duration: 500 },
-  // 4 – dot travels validate → condition
-  { activeNodes: ["validate"], completeNodes: ["trigger"], connector: "validate-condition", duration: 700 },
-  // 5 – condition activates, validate done
-  { activeNodes: ["condition"], completeNodes: ["trigger", "validate"], connector: null, duration: 500 },
-  // 6 – dots branch to taskA and taskB simultaneously
-  { activeNodes: ["condition"], completeNodes: ["trigger", "validate"], connector: "condition-taskA", duration: 700 },
-  // 7 – taskA + taskB active, condition done
-  { activeNodes: ["taskA", "taskB"], completeNodes: ["trigger", "validate", "condition"], connector: null, duration: 700 },
-  // 8 – taskA done, dot to merge (from A)
-  { activeNodes: ["taskA", "taskB"], completeNodes: ["trigger", "validate", "condition"], connector: "taskA-merge", duration: 700 },
-  // 9 – taskB done, dot to merge (from B)
-  { activeNodes: ["taskB"], completeNodes: ["trigger", "validate", "condition", "taskA"], connector: "taskB-merge", duration: 700 },
-  // 10 – merge active
-  { activeNodes: ["merge"], completeNodes: ["trigger", "validate", "condition", "taskA", "taskB"], connector: null, duration: 600 },
-  // 11 – dot to done
-  { activeNodes: ["merge"], completeNodes: ["trigger", "validate", "condition", "taskA", "taskB"], connector: "merge-done", duration: 700 },
-  // 12 – done active
-  { activeNodes: ["done"], completeNodes: ["trigger", "validate", "condition", "taskA", "taskB", "merge"], connector: null, duration: 800 },
-  // 13 – everything complete, pause
-  { activeNodes: [], completeNodes: ["trigger", "validate", "condition", "taskA", "taskB", "merge", "done"], connector: null, duration: 1200 },
+  { activeNodes: [], completeNodes: [], connectors: [], duration: 800 },
+  { activeNodes: ["trigger"], completeNodes: [], connectors: [], duration: 650 },
+  { activeNodes: ["trigger"], completeNodes: [], connectors: ["trigger-validate"], duration: 750 },
+  { activeNodes: ["validate"], completeNodes: ["trigger"], connectors: [], duration: 650 },
+  { activeNodes: ["validate"], completeNodes: ["trigger"], connectors: ["validate-condition"], duration: 750 },
+  { activeNodes: ["condition"], completeNodes: ["trigger", "validate"], connectors: [], duration: 650 },
+  // both branches fire at the same time
+  { activeNodes: ["condition"], completeNodes: ["trigger", "validate"], connectors: ["condition-taskA", "condition-taskB"], duration: 850 },
+  { activeNodes: ["taskA", "taskB"], completeNodes: ["trigger", "validate", "condition"], connectors: [], duration: 1100 },
+  { activeNodes: ["taskA", "taskB"], completeNodes: ["trigger", "validate", "condition"], connectors: ["taskA-merge", "taskB-merge"], duration: 850 },
+  { activeNodes: ["merge"], completeNodes: ["trigger", "validate", "condition", "taskA", "taskB"], connectors: [], duration: 750 },
+  { activeNodes: ["merge"], completeNodes: ["trigger", "validate", "condition", "taskA", "taskB"], connectors: ["merge-done"], duration: 750 },
+  { activeNodes: ["done"], completeNodes: ["trigger", "validate", "condition", "taskA", "taskB", "merge"], connectors: [], duration: 900 },
+  { activeNodes: [], completeNodes: ALL, connectors: [], duration: 1800 },
 ];
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-export function WorkflowGraph() {
-  const [stepIdx, setStepIdx] = useState(0);
-  const [dotProgress, setDotProgress] = useState(0);
-  const animRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
-  const startRef = useRef<number | null>(null);
-  const prefersReduced = useRef(false);
+const FINAL_STEP = STEPS[STEPS.length - 1]!;
 
+type NodeState = "idle" | "active" | "complete";
+type ConnState = "idle" | "flowing" | "done";
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+export function WorkflowGraph({ showGrid = true }: { showGrid?: boolean }) {
+  const uid = useId().replace(/:/g, "");
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [stepIdx, setStepIdx] = useState(0);
+  const [inView, setInView] = useState(true);
+  const [reduced, setReduced] = useState(false);
+
+  // Respect prefers-reduced-motion (show the finished state, no loop)
   useEffect(() => {
-    prefersReduced.current = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
+  // Pause the loop while the graph is off-screen
   useEffect(() => {
-    if (prefersReduced.current) return;
+    const el = svgRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry?.isIntersecting ?? true),
+      { threshold: 0.1 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
-    function tick(ts: number) {
-      if (startRef.current === null) startRef.current = ts;
-      const elapsed = ts - startRef.current;
-      const step = STEPS[stepIdx]!;
-      const progress = Math.min(elapsed / step.duration, 1);
-      setDotProgress(progress);
+  // Step machine: React state only changes once per step (not every frame)
+  useEffect(() => {
+    if (reduced || !inView) return;
+    const t = setTimeout(
+      () => setStepIdx((i) => (i + 1) % STEPS.length),
+      STEPS[stepIdx]!.duration,
+    );
+    return () => clearTimeout(t);
+  }, [stepIdx, reduced, inView]);
 
-      if (progress < 1) {
-        animRef.current = requestAnimationFrame(tick);
-      } else {
-        startRef.current = null;
-        setStepIdx((i) => (i + 1) % STEPS.length);
-        setDotProgress(0);
-      }
-    }
+  const step = reduced ? FINAL_STEP : STEPS[stepIdx]!;
+  const flowSeconds = (step.duration / 1000) * 0.9;
 
-    animRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
-    };
-  }, [stepIdx]);
+  const nodeState = (id: NodeId): NodeState =>
+    step.activeNodes.includes(id)
+      ? "active"
+      : step.completeNodes.includes(id)
+        ? "complete"
+        : "idle";
 
-  const step = STEPS[stepIdx]!;
-
-  function getNodeState(id: NodeId): NodeState {
-    if (step.activeNodes.includes(id)) return "active";
-    if (step.completeNodes.includes(id)) return "complete";
-    return "idle";
-  }
+  const connState = (c: ConnectorDef): ConnState => {
+    if (step.connectors.includes(c.id)) return "flowing";
+    const toState = nodeState(c.to);
+    return toState !== "idle" ? "done" : "idle";
+  };
 
   return (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${VW} ${VH}`}
+      preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "block",
-        overflow: "visible",
-      }}
+      style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
     >
-      {/* Arrowhead marker */}
       <defs>
-        <marker
-          id="arrow-idle"
-          markerWidth="6"
-          markerHeight="6"
-          refX="5"
-          refY="3"
-          orient="auto"
-        >
-          <path d="M0,0.5 L0,5.5 L5,3 Z" fill={C.connector} />
-        </marker>
-        <marker
-          id="arrow-active"
-          markerWidth="6"
-          markerHeight="6"
-          refX="5"
-          refY="3"
-          orient="auto"
-        >
-          <path d="M0,0.5 L0,5.5 L5,3 Z" fill={C.dot} />
-        </marker>
+        <filter id={`${uid}-blur`} x="-150%" y="-150%" width="400%" height="400%">
+          <feGaussianBlur stdDeviation="4" />
+        </filter>
+        <pattern id={`${uid}-grid`} width="24" height="24" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="1" fill="#ffffff" opacity="0.05" />
+        </pattern>
       </defs>
 
-      {/* Connectors */}
-      {CONNECTORS.map((conn) => {
-        const isActive = conn.id === step.connector;
-        return (
-          <React.Fragment key={conn.id}>
-            <path
-              d={conn.d}
-              fill="none"
-              stroke={C.connector}
-              strokeWidth={1.25}
-              strokeDasharray="4 3"
-              markerEnd="url(#arrow-idle)"
-            />
-            {/* Travelling dot */}
-            {isActive && (
-              <TravellingDot
-                pathDef={conn.d}
-                progress={dotProgress}
-                color={C.dot}
-              />
-            )}
-          </React.Fragment>
-        );
-      })}
+      {showGrid && (
+        <rect x={-40} y={-20} width={VW + 80} height={VH + 40} fill={`url(#${uid}-grid)`} />
+      )}
 
-      {/* Nodes */}
-      {NODES.map((node) => {
-        const state = getNodeState(node.id);
-        const x = nodeX(node.cx);
-        const y = nodeY(node.cy);
-        const isDone = node.id === "done" && state === "active";
+      {CONNECTORS.map((c) => (
+        <Connector
+          key={c.id}
+          def={c}
+          state={connState(c)}
+          duration={flowSeconds}
+          blurId={`${uid}-blur`}
+        />
+      ))}
 
-        const borderColor =
-          state === "active"
-            ? isDone
-              ? C.nodeCompleteBorder
-              : C.nodeActiveBorder
-            : state === "complete"
-            ? C.nodeCompleteBorder
-            : C.nodeBorder;
-
-        const iconColor =
-          state === "active"
-            ? C.iconActive
-            : state === "complete"
-            ? C.iconComplete
-            : C.iconIdle;
-
-        const glowColor =
-          state === "active"
-            ? isDone
-              ? C.nodeDoneGlow
-              : C.nodeActiveGlow
-            : state === "complete"
-            ? "transparent"
-            : "transparent";
-
-        return (
-          <g key={node.id}>
-            {/* Subtle glow */}
-            {state === "active" && (
-              <rect
-                x={x - 4}
-                y={y - 4}
-                width={NW + 8}
-                height={NH + 8}
-                rx={NR + 3}
-                fill={glowColor}
-              />
-            )}
-            {/* Node body */}
-            <rect
-              x={x}
-              y={y}
-              width={NW}
-              height={NH}
-              rx={NR}
-              fill={C.nodeBg}
-              stroke={borderColor}
-              strokeWidth={state !== "idle" ? 1.5 : 1}
-              style={{
-                transition: "stroke 0.4s ease, stroke-width 0.3s ease",
-              }}
-            />
-            {/* Icon area */}
-            <NodeIcon
-              Icon={node.Icon}
-              cx={x + 20}
-              cy={node.cy}
-              color={iconColor}
-            />
-            {/* Label */}
-            <text
-              x={x + 36}
-              y={node.cy - 5}
-              fontSize={11}
-              fontWeight={500}
-              fill={state !== "idle" ? C.label : "#888887"}
-              fontFamily="system-ui, -apple-system, sans-serif"
-              style={{ transition: "fill 0.4s ease" }}
-            >
-              {node.label}
-            </text>
-            {/* Sublabel */}
-            <text
-              x={x + 36}
-              y={node.cy + 9}
-              fontSize={9}
-              fill={C.sublabel}
-              fontFamily="system-ui, -apple-system, sans-serif"
-            >
-              {node.sublabel}
-            </text>
-            {/* Complete checkmark dot */}
-            {state === "complete" && (
-              <circle
-                cx={x + NW - 10}
-                cy={y + 10}
-                r={4}
-                fill={C.dotComplete}
-                opacity={0.85}
-              />
-            )}
-          </g>
-        );
-      })}
+      {NODES.map((n) => (
+        <Node key={n.id} def={n} state={nodeState(n.id)} />
+      ))}
     </svg>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Travelling dot sub-component (uses getPointAtLength for smooth motion)
+// Connector: dashed base, progress line that "draws in", glowing travelling dot
 // ---------------------------------------------------------------------------
-interface TravellingDotProps {
-  pathDef: string;
-  progress: number;
-  color: string;
-}
+function Connector({
+  def,
+  state,
+  duration,
+  blurId,
+}: {
+  def: ConnectorDef;
+  state: ConnState;
+  duration: number;
+  blurId: string;
+}) {
+  const baseRef = useRef<SVGPathElement | null>(null);
+  const progress = useMotionValue(0);
 
-function TravellingDot({ pathDef, progress, color }: TravellingDotProps) {
-  const pathRef = useRef<SVGPathElement | null>(null);
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-
-  // Recompute position whenever pathDef or progress changes
+  // The same motion value drives the drawn line and the dot position,
+  // so neither causes a React re-render while animating.
   useEffect(() => {
-    const el = pathRef.current;
-    if (!el) return;
-    const len = el.getTotalLength();
-    const pt = el.getPointAtLength(len * easeInOut(progress));
-    setPos({ x: pt.x, y: pt.y });
-  }, [pathDef, progress]);
+    if (state === "flowing") {
+      progress.set(0);
+      const controls = animate(progress, 1, {
+        duration,
+        ease: [0.45, 0, 0.2, 1],
+      });
+      return () => controls.stop();
+    }
+    if (state === "done") progress.set(1);
+    // "idle": keep the value; the line just fades out
+  }, [state, duration, progress]);
+
+  const pointAt = (p: number) => {
+    const el = baseRef.current;
+    if (!el) return { x: def.x1, y: def.y1 };
+    return el.getPointAtLength(el.getTotalLength() * p);
+  };
+  const dotX = useTransform(progress, (p) => pointAt(p).x);
+  const dotY = useTransform(progress, (p) => pointAt(p).y);
+
+  const lineColor = state === "done" ? C.lineDone : C.dot;
+  const arrowColor =
+    state === "idle" ? C.connector : state === "done" ? C.lineDone : C.dot;
 
   return (
-    <>
-      {/* Hidden path just for measurement */}
-      <path ref={pathRef} d={pathDef} fill="none" stroke="none" />
-      {pos && (
-        <circle cx={pos.x} cy={pos.y} r={4} fill={color} opacity={0.9} />
+    <g>
+      <path
+        ref={baseRef}
+        d={def.d}
+        fill="none"
+        stroke={C.connector}
+        strokeWidth={1.5}
+        strokeDasharray="5 4"
+      />
+      <motion.path
+        d={def.d}
+        fill="none"
+        strokeWidth={2}
+        pathLength={progress}
+        initial={false}
+        animate={{ opacity: state === "idle" ? 0 : 1, stroke: lineColor }}
+        transition={{ duration: 0.4 }}
+      />
+      <motion.path
+        d={`M ${def.x2 - 4.5} ${def.y2 - ARROW - 1} L ${def.x2 + 4.5} ${def.y2 - ARROW - 1} L ${def.x2} ${def.y2} Z`}
+        initial={false}
+        animate={{ fill: arrowColor }}
+        transition={{ duration: 0.4 }}
+      />
+      {state === "flowing" && (
+        <>
+          <motion.circle
+            cx={dotX}
+            cy={dotY}
+            r={11}
+            fill={C.dot}
+            opacity={0.35}
+            filter={`url(#${blurId})`}
+          />
+          <motion.circle cx={dotX} cy={dotY} r={4.5} fill={C.dot} />
+        </>
       )}
-    </>
+    </g>
   );
 }
 
-function easeInOut(t: number): number {
-  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
-
 // ---------------------------------------------------------------------------
-// Inline SVG icon renderer (avoids importing React components into SVG)
+// Node
 // ---------------------------------------------------------------------------
-interface NodeIconProps {
-  Icon: React.ElementType;
-  cx: number;
-  cy: number;
-  color: string;
-}
+function Node({ def, state }: { def: NodeDef; state: NodeState }) {
+  const x = def.cx - NW / 2;
+  const y = def.cy - NH / 2;
+  const active = state === "active";
+  const complete = state === "complete";
 
-function NodeIcon({ Icon, cx, cy, color }: NodeIconProps) {
+  const border = active
+    ? C.nodeActiveBorder
+    : complete
+      ? C.nodeCompleteBorder
+      : C.nodeBorder;
+  const iconColor = active ? C.iconActive : complete ? C.iconComplete : C.iconIdle;
+  const chipFill = active ? C.chipActive : complete ? C.chipComplete : C.chipIdle;
+
+  const chipSize = 36;
+  const chipX = x + 14;
+  const chipY = def.cy - chipSize / 2;
+  const statusX = x + NW - 24;
+
   return (
-    <foreignObject x={cx - 8} y={cy - 8} width={16} height={16}>
-      <div
-        // @ts-expect-error xmlns is valid on SVG foreignObject content
-        xmlns="http://www.w3.org/1999/xhtml"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 16,
-          height: 16,
-          color,
-          transition: "color 0.4s ease",
-        }}
+    // Quick "pop" each time a node becomes active
+    <motion.g
+      initial={false}
+      animate={{ scale: active ? [1, 1.04, 1] : 1 }}
+      transition={{ duration: 0.45, ease: "easeOut" }}
+    >
+      {/* Pulsing glow while running */}
+      <motion.rect
+        x={x - 7}
+        y={y - 7}
+        width={NW + 14}
+        height={NH + 14}
+        rx={NR + 7}
+        fill={C.glow}
+        initial={false}
+        animate={active ? { opacity: [0.25, 0.85, 0.25] } : { opacity: 0 }}
+        transition={
+          active
+            ? { duration: 1.4, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.4 }
+        }
+      />
+
+      {/* Body */}
+      <motion.rect
+        x={x}
+        y={y}
+        width={NW}
+        height={NH}
+        rx={NR}
+        fill={C.nodeBg}
+        strokeWidth={1.5}
+        initial={false}
+        animate={{ stroke: border }}
+        transition={{ duration: 0.4 }}
+      />
+
+      {/* Icon chip */}
+      <motion.rect
+        x={chipX}
+        y={chipY}
+        width={chipSize}
+        height={chipSize}
+        rx={10}
+        initial={false}
+        animate={{ fill: chipFill }}
+        transition={{ duration: 0.4 }}
+      />
+      <foreignObject x={chipX + 8} y={chipY + 8} width={20} height={20}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 20,
+            height: 20,
+            color: iconColor,
+            transition: "color 0.4s ease",
+          }}
+        >
+          <def.Icon size={18} strokeWidth={1.75} />
+        </div>
+      </foreignObject>
+
+      {/* Text */}
+      <motion.text
+        x={x + 62}
+        y={def.cy - 3}
+        fontSize={13.5}
+        fontWeight={600}
+        fontFamily="system-ui, -apple-system, sans-serif"
+        initial={false}
+        animate={{ fill: state === "idle" ? C.labelIdle : C.label }}
+        transition={{ duration: 0.4 }}
       >
-        <Icon size={14} strokeWidth={1.75} />
-      </div>
-    </foreignObject>
+        {def.label}
+      </motion.text>
+      <text
+        x={x + 62}
+        y={def.cy + 13}
+        fontSize={10.5}
+        fill={C.sublabel}
+        fontFamily="system-ui, -apple-system, sans-serif"
+      >
+        {def.sublabel}
+      </text>
+
+      {/* Status: hollow ring → spinner → check */}
+      <g transform={`translate(${statusX} ${def.cy})`}>
+        {state === "idle" && (
+          <circle r={4} fill="none" stroke={C.connector} strokeWidth={1.5} />
+        )}
+        {active && (
+          <>
+            <circle r={7} fill="none" stroke={C.connector} strokeWidth={2} />
+            <motion.circle
+              r={7}
+              fill="none"
+              stroke={C.dot}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeDasharray="14 30"
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
+            />
+          </>
+        )}
+        {complete && (
+          <>
+            <motion.circle
+              r={9}
+              fill={C.green}
+              fillOpacity={0.16}
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 420, damping: 22 }}
+            />
+            <motion.path
+              d="M -3.6 0.2 L -1 2.9 L 3.7 -2.7"
+              fill="none"
+              stroke={C.green}
+              strokeWidth={1.9}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 0.35, ease: "easeOut", delay: 0.08 }}
+            />
+          </>
+        )}
+      </g>
+    </motion.g>
   );
 }
