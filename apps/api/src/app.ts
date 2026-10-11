@@ -49,5 +49,5 @@ app.onError((err, c) => {
 
 app.route("/api/v1/auth", auth);
 
-app.use("/api/v1/workflow/*", authMiddleware);
-app.route("/api/v1/workflow", workflow);
+app.use("/api/v1/w/*", authMiddleware);
+app.route("/api/v1/w", workflow);

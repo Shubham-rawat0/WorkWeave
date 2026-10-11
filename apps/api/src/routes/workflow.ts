@@ -3,7 +3,6 @@ import type { User } from "../schemas/types";
 import { createRateLimiter } from "../middleware/rateLimit";
 import { prisma } from "@WorkOrchestrator/prisma";
 import { HTTPException } from "hono/http-exception";
-import { httpUrl } from "zod";
 
 const app = new Hono<{ Variables: { user: User } }>();
 
@@ -74,9 +73,11 @@ app.get("/workflows", async (c) => {
 
 app.get("/workflows/:id",async (c)=>{
     const id=c.req.param("id")
+    const userId=c.get("user").id
     const workflow=await prisma.workflow.findFirst({
         where:{
-            id
+            id,
+            userId
         },
         include:{
             trigger: {
