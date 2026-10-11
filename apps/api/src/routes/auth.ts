@@ -15,6 +15,7 @@ import {
 } from "../lib/google";
 import { validationHook } from "../lib/validator";
 import { createSession, getSessionUser, invalidateSession, rotateSession } from "../utils/session";
+import { createRateLimiter } from "../middleware/rateLimit";
 
 const app = new Hono();
 
@@ -26,7 +27,7 @@ const userSelect = {
 } as const;
 
 app.post(
-    "/signup",
+    "/signup", createRateLimiter(5, 60_000),
     zValidator("json", SignupSchema, validationHook),
     async (c) => {
         const body = c.req.valid("json");
@@ -82,6 +83,7 @@ app.post(
 
 app.post(
     "/signin",
+    createRateLimiter(5, 60_000),
     zValidator("json", SigninSchema, validationHook),
     async (c) => {
         const body = c.req.valid("json");
@@ -137,7 +139,7 @@ app.post("/signout", async (c) => {
     );
 });
 
-app.get("/me", async (c) => {
+app.get("/me", createRateLimiter(60, 60_000), async (c) => {
     const user = await getSessionUser(c);
 
     if (!user) {
@@ -149,7 +151,7 @@ app.get("/me", async (c) => {
     return c.json({ user }, 200);
 });
 
-app.get("/google", async (c) => {
+app.get("/google", createRateLimiter(10, 60_000), async (c) => {
     const client = getGoogleOAuthClient();
 
     const state = generateSessionToken();
@@ -283,7 +285,7 @@ app.get("/google/callback", async (c) => {
     const redirectUrl = process.env.WEB_APP_URL;
 
     if (redirectUrl) {
-        return c.redirect(redirectUrl);
+        return c.redirect(`${redirectUrl}/home`);
     }
 
     return c.json(

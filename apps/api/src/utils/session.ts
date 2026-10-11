@@ -3,16 +3,24 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { prisma } from "@WorkOrchestrator/prisma";
 import { generateSessionToken, getHashToken } from "../lib/auth";
 
-export function getClientIp(c:Context): string | null {
+//network
+
+export function getClientIp(c: Context): string | null {
     const forwardedFor = c.req.header("x-forwarded-for");
     const clientIp = forwardedFor?.split(",")[0]?.trim();
 
-    return (
-        clientIp ||
+    if (clientIp) {
+        return clientIp;
+    }
+
+    const realIp =
         c.req.header("x-real-ip")?.trim() ||
-        c.req.header("cf-connecting-ip")?.trim() ||
-        null
-    );
+        c.req.header("cf-connecting-ip")?.trim();
+
+    if (realIp) {
+        return realIp;
+    }
+    return null
 }
 
 export function getUserAgent(c: Context): string | null {

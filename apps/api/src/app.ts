@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
-import auth from "./routes/auth"
+import { auth, workflow } from "./routes";
+import { authMiddleware } from "./middleware/auth";
 
 export const app=new Hono()
 
@@ -47,3 +48,6 @@ app.onError((err, c) => {
 });
 
 app.route("/api/v1/auth", auth);
+
+app.use("/api/v1/workflow/*", authMiddleware);
+app.route("/api/v1/workflow", workflow);
