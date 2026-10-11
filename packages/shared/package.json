@@ -13,6 +13,21 @@
     "./nodeRegistry": {
       "types": "./src/registry/nodeRegistry.ts",
       "default": "./src/registry/nodeRegistry.ts"
+    },
+    "./redis": {
+      "types": "./src/runtime/redis.ts",
+      "default": "./src/runtime/redis.ts"
+    },
+    "./queue": {
+      "types": "./src/runtime/queue.ts",
+      "default": "./src/runtime/queue.ts"
     }
+  },
+  "dependencies": {
+    "bullmq": "^6.3.12",
+    "ioredis": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/ioredis": "^5.0.0"
   }
 }
