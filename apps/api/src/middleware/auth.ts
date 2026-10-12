@@ -7,7 +7,7 @@ export const authMiddleware = createMiddleware<{ Variables: { user: User } }>(
     async (c, next) => {
         const user = await getSessionUser(c);
 
-if (!user) {
+        if (!user) {
                 throw new HTTPException(401, {
                     message: "Not authenticated",
                 });
