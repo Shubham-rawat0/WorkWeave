@@ -19,6 +19,7 @@
       "name": "@WorkOrchestrator/api",
       "version": "0.0.0",
       "dependencies": {
+        "@WorkOrchestrator/shared": "workspace:*",
         "@WorkOrchestrator/prisma": "workspace:*",
         "@hono/zod-validator": "^0.9.1",
         "bcrypt": "^6.0.0",

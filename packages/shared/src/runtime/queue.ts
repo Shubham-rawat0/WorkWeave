@@ -1,4 +1,4 @@
-import { Queue, QueueOptions } from "bullmq";
+import { Queue, type QueueOptions } from "bullmq";
 import { getRedisConnectionOptions } from "./redis";
 
 const queueName = "workflow-runs";

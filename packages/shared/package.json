@@ -21,6 +21,14 @@
     "./queue": {
       "types": "./src/runtime/queue.ts",
       "default": "./src/runtime/queue.ts"
+    },
+    "./runLock": {
+      "types": "./src/runtime/runLock.ts",
+      "default": "./src/runtime/runLock.ts"
+    },
+    "./executionSignature": {
+      "types": "./src/runtime/executionSignature.ts",
+      "default": "./src/runtime/executionSignature.ts"
     }
   },
   "dependencies": {

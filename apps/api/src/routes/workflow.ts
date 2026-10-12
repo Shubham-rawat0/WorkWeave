@@ -3,10 +3,14 @@ import type { User } from "../schemas/types";
 import { createRateLimiter } from "../middleware/rateLimit";
 import { prisma, Prisma, type WorkflowStatus } from "@WorkOrchestrator/prisma";
 import { HTTPException } from "hono/http-exception";
-import { createWorkflowInputSchema, executeWorkflowInputSchema, updateWorkflowInputSchema } from "../schemas/workflow";
+import { createWorkflowInputSchema, executeWorkflowInputSchema, EXECUTION_STREAM_TOKEN_TTL_SECONDS, updateWorkflowInputSchema } from "../schemas/workflow";
 import { zValidator } from "@hono/zod-validator";
 import { validationHook } from "../lib/validator";
+import { RunReservationLockTimeoutError, withUserRunReservationLock } from "@WorkOrchestrator/shared/runLock";
 import { validateWorkflowGraph } from "../lib/workflow";
+import { getWorkflowQueue } from "@WorkOrchestrator/shared/queue";
+import { resolveExecutionStreamSigningSecret, resolveExecutionStreamWsBaseUrlFromEnv } from "../lib/ws";
+import { signExecutionStreamToken } from "@WorkOrchestrator/shared/executionSignature";
 
 const app = new Hono<{ Variables: { user: User } }>();
 
@@ -293,15 +297,25 @@ app.post("/update",zValidator("json",updateWorkflowInputSchema,validationHook),a
 app.post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook),async(c)=>{
     const input=c.req.valid("json")
     const userId=c.get("user").id
+    if (input.nodeId && (input.triggerSource || input.triggerNodeId)) {
+        throw new HTTPException(400, { message: "Provide either nodeId or triggerSource not both." }) 
+    }
+    if (
+        (input.triggerSource && !input.triggerNodeId) ||
+        (!input.triggerSource && input.triggerNodeId)
+    ) {
+        throw new HTTPException(400, { message: "Trigger source and trigger id must be provided." })
+    }
+
     const workflow=await prisma.workflow.findFirst({
         where:{
-            id:input.nodeId,
+            id:input.workflowId,
             userId
         }
     })
 
     if (!workflow){
-        throw new HTTPException(400,{message:"Workflow does not exist"})
+        throw new HTTPException(404,{message:"Workflow does not exist"})
     }
 
     const workflowNodes = Array.isArray(workflow.nodes)
@@ -314,15 +328,6 @@ app.post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook)
             } | null;
         }>)
         : [];
-    if (input.nodeId && (input.triggerSource || input.triggerNodeId)) {
-        throw new HTTPException(400, { message: "Provide either nodeId or triggerSource not both." }) 
-    }
-    if (
-        (input.triggerSource && !input.triggerNodeId) ||
-        (!input.triggerSource && input.triggerNodeId)
-    ) {
-        throw new HTTPException(400, { message: "Trigger source and tigger id must be provided." })
-    }
     
     if (input.nodeId) {
         const nodeExists = workflowNodes.some(
@@ -372,13 +377,138 @@ app.post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook)
                 message: "Manual execution requires at least one active manual trigger node.Use webhook URL or cron schedule for this workflow." })
         }
     }
-
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     let workflowRun
     try {
-        workflowRun=await runWith
+        workflowRun = await withUserRunReservationLock(userId,()=>prisma.$transaction(async(tx)=>{
+            await tx.usageRecord.upsert({
+                where: { userId_month: { userId: userId, month } },
+                create: { userId: userId, month, runCount: 0 },
+                update: {},
+            });
+            const pendingRuns = await tx.workflowRun.count({
+                where: {
+                    status: "Pending",
+                    workflow: { userId: userId },
+                },
+            });
+            if (pendingRuns >=2){
+                throw new HTTPException(
+                    409,
+                    {message: `Concurrent workflow limit reached 2. Wait for current executions to finish or upgrade your plan.`,
+               } );
+            }
+            await tx.usageRecord.update({
+                where: { userId_month: { userId: userId!, month } },
+                data: { runCount: { increment: 1 } },
+            });
+
+            return tx.workflowRun.create({
+                data: {
+                    workflowId: input.workflowId,
+                    metadata: (() => {
+                        const nowIso = new Date().toISOString();
+                        if (input.nodeId) {
+                            return {
+                                source: "manual-node",
+                                nodeId: input.nodeId,
+                            };
+                        }
+                        if (input.triggerSource && input.triggerNodeId) {
+                            if (input.triggerSource === "cron") {
+                                return {
+                                    source: "cron",
+                                    nodeId: input.triggerNodeId,
+                                    scheduledAt: nowIso,
+                                };
+                            }
+                            return {
+                                source: "webhook",
+                                nodeId: input.triggerNodeId,
+                                payload: {},
+                                query: {},
+                                headers: {},
+                                receivedAt: nowIso,
+                                ip: "manual-run-now",
+                            };
+                        }
+                        return {
+                            source: "manual",
+                        };
+                    })(),
+                },
+            });
+        }))
     } catch (error) {
-        
+        if (error instanceof RunReservationLockTimeoutError) {
+            throw new HTTPException(
+                409,
+                {message:
+                    "Another execution request is being processed. Please retry in a moment.",
+            });
+        }
+        throw error;
     }
-})  
+    try {
+        await getWorkflowQueue().add(
+            "process-workflow",
+            { workflowRunId: workflowRun.id },
+            { jobId: workflowRun.id },
+        );
+    } catch {
+        await prisma.$transaction([
+            prisma.workflowRun.update({
+                where: { id: workflowRun.id },
+                data: {
+                    status: "Failure",
+                    finishedAt: new Date(),
+                    errorMetadata: {
+                        message: "Failed to enqueue workflow run",
+                    } as any,
+                },
+            }),
+            prisma.usageRecord.update({
+                where: { userId_month: { userId: userId!, month } },
+                data: { runCount: { decrement: 1 } },
+            }),
+        ]);
+        throw new HTTPException(
+            500,
+            {message: "Failed to enqueue workflow run",
+        });
+    }
+    let stream:{
+            token: string;
+            wsUrl?: string;
+            expiresInSeconds: number;
+        }| undefined;
+    try {
+        const token = signExecutionStreamToken(
+            {
+                runId: workflowRun.id,
+                userId: userId!,
+                ttlSeconds: EXECUTION_STREAM_TOKEN_TTL_SECONDS,
+            },
+            resolveExecutionStreamSigningSecret(),
+        );
+        const wsUrl = resolveExecutionStreamWsBaseUrlFromEnv();
+        stream = {
+            token,
+            expiresInSeconds: EXECUTION_STREAM_TOKEN_TTL_SECONDS,
+            ...(wsUrl ? { wsUrl } : {}),
+        };
+    } catch (error) {
+        console.warn(
+            "[workflow.execute] Failed to prepare execution stream bootstrap token.",
+            error,
+        );
+    }
+    return c.json({
+        runId: workflowRun.id,
+        workflowId: input.workflowId,
+        ...(stream ? { stream } : {}),
+    });
+});
 
 export default app
