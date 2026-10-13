@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import { Prisma } from "@WorkOrchestrator/prisma";
-import { auth, workflow } from "./routes";
+import { auth, credentials, workflow } from "./routes";
 import { authMiddleware } from "./middleware/auth";
 
 const WEB_APP_URL = process.env.WEB_APP_URL ?? "http://localhost:3000";
@@ -76,5 +76,8 @@ app.onError((err, c) => {
 
 app.route("/api/v1/auth", auth);
 
-app.use("/api/v1/w/*", authMiddleware);
-app.route("/api/v1/w", workflow);
+app.use("/api/v1/workflow/*", authMiddleware);
+app.route("/api/v1/workflow", workflow);
+
+app.use("/api/v1/cred/*",authMiddleware)
+app.route("/api/v1/cred",credentials)

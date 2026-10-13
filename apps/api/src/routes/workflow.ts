@@ -43,7 +43,7 @@ async function assertAvailableActionsExist(
     }
 }
 
-app.get("/workflows", async (c) => {
+app.get("/", async (c) => {
     const user = c.get("user");
     const userId = user.id;
 
@@ -102,7 +102,7 @@ app.get("/workflows", async (c) => {
     );
 });
 
-app.get("/workflows/:id",async (c)=>{
+app.get("/:id",async (c)=>{
     const id=c.req.param("id")
     const userId=c.get("user").id
     const workflow=await prisma.workflow.findFirst({
@@ -127,7 +127,7 @@ app.get("/workflows/:id",async (c)=>{
     return c.json({ workflow });
 })
 
-app.delete("/workflows/:id", async (c) => {
+app.delete("/:id", async (c) => {
     const id = c.req.param("id");
     const userId = c.get("user").id;
     const result = await prisma.workflow.deleteMany({
@@ -511,11 +511,14 @@ app.post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook)
     });
 });
 
-app.get("/workflow/runs",async(c)=>{
+app.get("/runs",async(c)=>{
     const input=workflowRunsInputSchema.parse(c.req.query())
+    const userId=c.get("user").id
     const workflowRuns=await prisma.workflowRun.findMany({
         where:{
-            workflowId:input.workflowId
+            workflowId:input.workflowId,
+            workflow:{ userId },
+            ...(input.status && { status: input.status }),
         },
         include: {
             workflow: { select: { id: true, title: true } },
