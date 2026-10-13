@@ -7,7 +7,8 @@
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/bun": "latest",
-    "@types/node": "^26.6.4"
+    "@types/node": "^26.6.4",
+    "@types/nodemailer": "^6.4.17"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -20,6 +21,7 @@
     "google-auth-library": "^11.2.0",
     "hono": "^4.13.13",
     "hono-rate-limiter": "^0.5.4",
+    "nodemailer": "^7.0.5",
     "zod": "^4.6.5"
   }
 }

@@ -2,8 +2,9 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { CodeChallengeMethod } from "google-auth-library";
+import { createHash, randomInt } from "node:crypto";
 import { prisma, Prisma } from "@WorkOrchestrator/prisma";
-import { SigninSchema, SignupSchema } from "../schemas/auth";
+import { ChangePasswordSchema, ForgotPasswordRequestSchema, ForgotPasswordResetSchema, SigninSchema, SignupSchema, UpdateProfileSchema } from "../schemas/auth";
 import { comparePassword, generateSessionToken, hashPassword } from "../lib/auth";
 import {
     clearOAuthStateCookie,
@@ -16,6 +17,8 @@ import {
 import { validationHook } from "../lib/validator";
 import { createSession, getSessionUser, invalidateSession, rotateSession } from "../utils/session";
 import { createRateLimiter } from "../middleware/rateLimit";
+import { authMiddleware } from "../middleware/auth";
+import { isSmtpConfigured, sendPasswordResetCode } from "../lib/email";
 
 const app = new Hono();
 
@@ -25,6 +28,104 @@ const userSelect = {
     email: true,
     provider: true,
 } as const;
+
+const hashResetCode = (email: string, otp: string) =>
+    createHash("sha256").update(`${email}:${otp}`).digest("hex");
+
+app.post(
+    "/change-password",
+    authMiddleware,
+    createRateLimiter(5, 60_000),
+    zValidator("json", ChangePasswordSchema, validationHook),
+    async (c) => {
+        const { currentPassword, newPassword } = c.req.valid("json");
+        const user = await prisma.user.findUnique({ where: { id: c.get("user").id } });
+        if (!user || user.provider !== "credentials" || !user.password ||
+            !(await comparePassword(currentPassword, user.password))) {
+            throw new HTTPException(400, { message: "Current password is incorrect" });
+        }
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { password: await hashPassword(newPassword) },
+        });
+        return c.json({ message: "Password updated successfully" }, 200);
+    },
+);
+
+app.post(
+    "/forgot-password/request",
+    createRateLimiter(3, 60_000),
+    zValidator("json", ForgotPasswordRequestSchema, validationHook),
+    async (c) => {
+        if (!isSmtpConfigured()) {
+            throw new HTTPException(503, { message: "Password reset email is not configured yet" });
+        }
+        const { email } = c.req.valid("json");
+        const user = await prisma.user.findUnique({ where: { email } });
+        // Keep the response the same for unknown emails and accounts without password login.
+        if (user?.provider === "credentials" && user.password) {
+            const otp = String(randomInt(0, 1_000_000)).padStart(6, "0");
+            const tokenHash = hashResetCode(email, otp);
+            await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+            await prisma.passwordResetToken.create({
+                data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + 10 * 60_000) },
+            });
+            try {
+                await sendPasswordResetCode(email, otp);
+            } catch (err) {
+                await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+                throw err;
+            }
+        }
+        return c.json({ message: "If an account can be reset, a code has been sent" }, 200);
+    },
+);
+
+app.post(
+    "/forgot-password/reset",
+    createRateLimiter(5, 60_000),
+    zValidator("json", ForgotPasswordResetSchema, validationHook),
+    async (c) => {
+        const { email, otp, newPassword } = c.req.valid("json");
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user || user.provider !== "credentials" || !user.password) {
+            throw new HTTPException(400, { message: "Invalid or expired reset code" });
+        }
+        const token = await prisma.passwordResetToken.findFirst({
+            where: { userId: user.id, tokenHash: hashResetCode(email, otp), expiresAt: { gt: new Date() } },
+        });
+        if (!token) throw new HTTPException(400, { message: "Invalid or expired reset code" });
+
+        const passwordHash = await hashPassword(newPassword);
+        await prisma.$transaction(async (tx) => {
+            const consumed = await tx.passwordResetToken.deleteMany({
+                where: { id: token.id, expiresAt: { gt: new Date() } },
+            });
+            if (consumed.count !== 1) {
+                throw new HTTPException(400, { message: "Invalid or expired reset code" });
+            }
+            await tx.user.update({ where: { id: user.id }, data: { password: passwordHash } });
+            await tx.passwordResetToken.deleteMany({ where: { userId: user.id } });
+            await tx.session.deleteMany({ where: { userId: user.id } });
+        });
+        return c.json({ message: "Password reset successfully. Please sign in." }, 200);
+    },
+);
+
+app.patch(
+    "/profile",
+    authMiddleware,
+    zValidator("json", UpdateProfileSchema, validationHook),
+    async (c) => {
+        const { name } = c.req.valid("json");
+        const user = await prisma.user.update({
+            where: { id: c.get("user").id },
+            data: { name },
+            select: userSelect,
+        });
+        return c.json({ message: "Profile updated successfully", user }, 200);
+    },
+);
 
 app.post(
     "/signup", createRateLimiter(5, 60_000),
