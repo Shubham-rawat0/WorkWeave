@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { CodeChallengeMethod } from "google-auth-library";
-import { createHash, randomInt } from "node:crypto";
+import { createHmac, randomInt } from "node:crypto";
 import { prisma, Prisma } from "@WorkOrchestrator/prisma";
 import { ChangePasswordSchema, ForgotPasswordRequestSchema, ForgotPasswordResetSchema, SigninSchema, SignupSchema, UpdateProfileSchema } from "../schemas/auth";
 import { comparePassword, generateSessionToken, hashPassword } from "../lib/auth";
@@ -29,8 +29,11 @@ const userSelect = {
     provider: true,
 } as const;
 
-const hashResetCode = (email: string, otp: string) =>
-    createHash("sha256").update(`${email}:${otp}`).digest("hex");
+const hashResetCode = (email: string, otp: string) => {
+    const secret = process.env.BETTER_AUTH_SECRET ?? process.env.EXECUTION_STREAM_SIGNING_SECRET;
+    if (!secret) throw new HTTPException(503, { message: "Password reset is not configured yet" });
+    return createHmac("sha256", secret).update(`${email}:${otp}`).digest("hex");
+};
 
 app.post(
     "/change-password",
@@ -57,7 +60,7 @@ app.post(
     createRateLimiter(3, 60_000),
     zValidator("json", ForgotPasswordRequestSchema, validationHook),
     async (c) => {
-        if (!isSmtpConfigured()) {
+        if (!isSmtpConfigured() || !(process.env.BETTER_AUTH_SECRET ?? process.env.EXECUTION_STREAM_SIGNING_SECRET)) {
             throw new HTTPException(503, { message: "Password reset email is not configured yet" });
         }
         const { email } = c.req.valid("json");
@@ -86,6 +89,9 @@ app.post(
     createRateLimiter(5, 60_000),
     zValidator("json", ForgotPasswordResetSchema, validationHook),
     async (c) => {
+        if (!(process.env.BETTER_AUTH_SECRET ?? process.env.EXECUTION_STREAM_SIGNING_SECRET)) {
+            throw new HTTPException(503, { message: "Password reset is not configured yet" });
+        }
         const { email, otp, newPassword } = c.req.valid("json");
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || user.provider !== "credentials" || !user.password) {

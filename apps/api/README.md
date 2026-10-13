@@ -13,3 +13,16 @@ bun run index.ts
 ```
 
 This project was created using `bun init` in bun v1.3.14. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+
+## Password reset email
+
+Configure these environment variables before enabling password reset:
+
+- `SMTP_HOST`
+- `SMTP_PORT` (use `465` for implicit TLS)
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM`
+- `BETTER_AUTH_SECRET` or `EXECUTION_STREAM_SIGNING_SECRET` (used to hash reset codes)
+
+Apply the `packages/db/prisma/migrations/20261013120000_password_reset_token` migration and regenerate the Prisma client after changing the schema.
