@@ -19,11 +19,9 @@ function maskKeys(keys: Record<string,unknown>):Record<string,string>{
     return masked
 }
 
-const app=new Hono<{Variables:{user:User}}>
-
-app.use(createRateLimiter(20,60_000))
-
-app.post("/create",zValidator("json",createCredentialsInputSchema,validationHook),async(c)=>{
+const app = new Hono<{Variables:{user:User}}>()
+    .use("*", createRateLimiter(20,60_000))
+    .post("/create",zValidator("json",createCredentialsInputSchema,validationHook),async(c)=>{
     const id=c.get("user").id
     const input=c.req.valid("json")
     const encrypted=encryptJson(input.keys)
@@ -57,7 +55,7 @@ app.post("/create",zValidator("json",createCredentialsInputSchema,validationHook
     }
 })
 
-app.post("/update",zValidator("json",UpdateCredentialsInputSchema,validationHook),async(c)=>{
+.post("/update",zValidator("json",UpdateCredentialsInputSchema,validationHook),async(c)=>{
     const input=c.req.valid("json")
     const userId=c.get("user").id
     const exisiting=await prisma.credentials.findFirst({
@@ -86,9 +84,9 @@ app.post("/update",zValidator("json",UpdateCredentialsInputSchema,validationHook
         title: credential.title,
         platform: credential.platform,
     })
-});
+})
 
-app.post("/remove/:id",async(c)=>{
+.post("/remove/:id",async(c)=>{
     const userId=c.get("user").id
     const id=c.req.param("id")
     const existing = await prisma.credentials.findFirst({
@@ -106,7 +104,7 @@ app.post("/remove/:id",async(c)=>{
     return c.json({ success: true })
 })
 
-app.get("/",async(c)=>{
+.get("/",async(c)=>{
     const userId=c.get("user").id
     const credentials = await prisma.credentials.findMany({
         where: {
@@ -123,7 +121,7 @@ app.get("/",async(c)=>{
     return c.json({credentials});
 })
 
-app.get("/:id",async(c)=>{
+.get("/:id",async(c)=>{
     const userId = c.get("user").id
     const id=c.req.param("id")
     const credential = await prisma.credentials.findFirst({
@@ -143,6 +141,6 @@ app.get("/:id",async(c)=>{
         createdAt: credential.createdAt,
         updatedAt: credential.updatedAt,
     });
-})
+});
 
 export default app

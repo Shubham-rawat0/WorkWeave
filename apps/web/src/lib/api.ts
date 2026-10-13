@@ -1,4 +1,9 @@
-import { hc, type ClientResponse } from "hono/client";
+import {
+    hc,
+    type ClientResponse,
+    type InferRequestType,
+    type InferResponseType,
+} from "hono/client";
 import type { AppType } from "@WorkOrchestrator/api";
 
 export const API_URL =
@@ -6,102 +11,96 @@ export const API_URL =
 
 export const GOOGLE_AUTH_URL = `${API_URL}/api/v1/auth/google`;
 
-type RpcResponse = Promise<ClientResponse<unknown>>;
-type JsonRequest = (args: { json: Record<string, unknown> }) => RpcResponse;
-type DeleteSessionRequest = (args: { param: { id: string } }) => RpcResponse;
-
-type ApiClient = {
-    auth: {
-        me: { $get: () => RpcResponse };
-        signin: { $post: JsonRequest };
-        signup: { $post: JsonRequest };
-        "change-password": { $post: JsonRequest };
-        "forgot-password": {
-            request: { $post: JsonRequest };
-            reset: { $post: JsonRequest };
-        };
-        profile: { $patch: JsonRequest };
-        sessions: {
-            $get: () => RpcResponse;
-            $delete: () => RpcResponse;
-            ":id": { $delete: DeleteSessionRequest };
-        };
-        signout: { $post: () => RpcResponse };
-    };
-    workflow: { index: { $get: () => RpcResponse } };
-};
-
-const client = hc<AppType>(`${API_URL}/api/v1`, {
+const client = hc<AppType>(API_URL, {
     init: { credentials: "include" },
-}) as unknown as ApiClient;
+});
 
-export type User = {
-    id: string;
-    name: string;
-    email: string;
-    image: string | null;
-    provider: string;
-};
+export type User = InferResponseType<typeof client.api.v1.auth.me.$get>["user"];
+export type WorkflowSummary = InferResponseType<
+    typeof client.api.v1.workflow.$get
+>[number];
+export type WorkflowStatus = Exclude<WorkflowSummary["lastRunStatus"], null>;
+export type SessionInfo = InferResponseType<
+    typeof client.api.v1.auth.sessions.$get
+>["sessions"][number];
+type ResponseBody<Response> = Response extends ClientResponse<
+    infer Body,
+    infer Status,
+    "json"
+>
+    ? Status extends 200 | 201
+        ? Body
+        : never
+    : never;
 
-export type WorkflowStatus = "Success" | "Failure" | "Pending";
-export type WorkflowSummary = {
-    id: string;
-    title: string;
-    createdAt: string;
-    updatedAt: string;
-    nodeCount: number;
-    edgeCount: number;
-    lastRunStatus: WorkflowStatus | null;
-    lastRunAt: string | null;
-};
+function isSuccess<Response extends ClientResponse<unknown, number, "json">>(
+    response: Response,
+): response is Extract<Response, { status: 200 | 201 }> {
+    return response.status === 200 || response.status === 201;
+}
 
-export type SessionInfo = {
-    id: string;
-    ipAddress: string | null;
-    userAgent: string | null;
-    createdAt: string;
-    expiresAt: string;
-    current: boolean;
-};
-
-async function unwrap<T>(request: RpcResponse): Promise<T> {
-    const res = (await request) as unknown as Response & {
-        json(): Promise<T>;
-    };
-    if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-            message?: string;
-        } | null;
-        throw new Error(body?.message ?? `Request failed (${res.status})`);
+async function unwrap<
+    Response extends ClientResponse<unknown, number, "json">,
+>(request: Promise<Response>): Promise<ResponseBody<Response>> {
+    const response = await request;
+    if (!isSuccess(response)) {
+        const body: unknown = await response
+            .clone()
+            .json()
+            .catch(() => null);
+        const message =
+            body &&
+            typeof body === "object" &&
+            "message" in body &&
+            typeof body.message === "string"
+                ? body.message
+                : `Request failed (${response.status})`;
+        throw new Error(message);
     }
-    return res.json();
+    // Hono's client models each response status as a union. After checking the
+    // success status, associate its JSON body with the successful branch only.
+    return (await response.json()) as ResponseBody<Response>;
 }
 
 export const api = {
-    me: () => unwrap<{ user: User }>(client.auth.me.$get()),
-    signin: (body: { email: string; password: string }) =>
-        unwrap<{ message: string; user: User }>(client.auth.signin.$post({ json: body })),
-    signup: (body: { name: string; email: string; password: string }) =>
-        unwrap<{ message: string; user: User }>(client.auth.signup.$post({ json: body })),
-    changePassword: (body: {
-        currentPassword: string;
-        newPassword: string;
-        logoutOtherDevices?: boolean;
-    }) => unwrap<{ message: string; revokedSessions: number }>(client.auth["change-password"].$post({ json: body })),
-    requestPasswordReset: (body: { email: string }) =>
-        unwrap<{ message: string }>(client.auth["forgot-password"].request.$post({ json: body })),
-    resetPassword: (body: {
-        email: string;
-        otp: string;
-        newPassword: string;
-    }) => unwrap<{ message: string }>(client.auth["forgot-password"].reset.$post({ json: body })),
-    updateProfile: (body: { name: string; image?: string }) =>
-        unwrap<{ message: string; user: User }>(client.auth.profile.$patch({ json: body })),
-    sessions: () => unwrap<{ sessions: SessionInfo[] }>(client.auth.sessions.$get()),
+    me: () => unwrap(client.api.v1.auth.me.$get()),
+    signin: (
+        body: InferRequestType<typeof client.api.v1.auth.signin.$post>["json"],
+    ) => unwrap(client.api.v1.auth.signin.$post({ json: body })),
+    signup: (
+        body: InferRequestType<typeof client.api.v1.auth.signup.$post>["json"],
+    ) => unwrap(client.api.v1.auth.signup.$post({ json: body })),
+    changePassword: (
+        body: InferRequestType<
+            (typeof client.api.v1.auth)["change-password"]["$post"]
+        >["json"],
+    ) => unwrap(client.api.v1.auth["change-password"].$post({ json: body })),
+    requestPasswordReset: (
+        body: InferRequestType<
+            (typeof client.api.v1.auth)["forgot-password"]["request"]["$post"]
+        >["json"],
+    ) =>
+        unwrap(
+            client.api.v1.auth["forgot-password"].request.$post({ json: body }),
+        ),
+    resetPassword: (
+        body: InferRequestType<
+            (typeof client.api.v1.auth)["forgot-password"]["reset"]["$post"]
+        >["json"],
+    ) =>
+        unwrap(
+            client.api.v1.auth["forgot-password"].reset.$post({ json: body }),
+        ),
+    updateProfile: (
+        body: InferRequestType<typeof client.api.v1.auth.profile.$patch>["json"],
+    ) => unwrap(client.api.v1.auth.profile.$patch({ json: body })),
+    sessions: () => unwrap(client.api.v1.auth.sessions.$get()),
     revokeSession: (id: string) =>
-        unwrap<{ message: string }>(client.auth.sessions[":id"].$delete({ param: { id } })),
+        unwrap(
+            client.api.v1.auth.sessions[":id"].$delete({ param: { id } }),
+        ),
     revokeOtherSessions: () =>
-        unwrap<{ message: string; revokedSessions: number }>(client.auth.sessions.$delete()),
-    signout: () => unwrap<{ message: string }>(client.auth.signout.$post()),
-    workflows: () => unwrap<WorkflowSummary[]>(client.workflow.index.$get()),
+        unwrap(client.api.v1.auth.sessions.$delete()),
+    signout: () => unwrap(client.api.v1.auth.signout.$post()),
+    workflows: () => unwrap(client.api.v1.workflow.$get()),
 };

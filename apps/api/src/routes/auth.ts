@@ -28,8 +28,6 @@ import { createRateLimiter } from "../middleware/rateLimit";
 import { authMiddleware } from "../middleware/auth";
 import { isSmtpConfigured, sendPasswordResetCode } from "../lib/email";
 
-const app = new Hono()
-
 const userSelect = {
     id: true,
     name: true,
@@ -44,7 +42,7 @@ const hashResetCode = (email: string, otp: string) => {
     return createHmac("sha256", secret).update(`${email}:${otp}`).digest("hex");
 };
 
-app.post(
+const app = new Hono().post(
     "/change-password",
     authMiddleware,
     createRateLimiter(5, 60_000),

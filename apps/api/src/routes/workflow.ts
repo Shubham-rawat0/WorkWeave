@@ -12,10 +12,6 @@ import { getWorkflowQueue } from "@WorkOrchestrator/shared/queue";
 import { resolveExecutionStreamSigningSecret, resolveExecutionStreamWsBaseUrlFromEnv } from "../lib/ws";
 import { signExecutionStreamToken } from "@WorkOrchestrator/shared/executionSignature";
 
-const app = new Hono<{ Variables: { user: User } }>();
-
-app.use(createRateLimiter(120, 60_000))
-
 function toJson(value: unknown): Prisma.InputJsonValue {
     if (value === null) {
         return Prisma.JsonNull as unknown as Prisma.InputJsonValue;
@@ -43,7 +39,9 @@ async function assertAvailableActionsExist(
     }
 }
 
-app.get("/", async (c) => {
+const app = new Hono<{ Variables: { user: User } }>()
+    .use("*", createRateLimiter(120, 60_000))
+    .get("/", async (c) => {
     const user = c.get("user");
     const userId = user.id;
 
@@ -100,9 +98,9 @@ app.get("/", async (c) => {
             lastRunAt: workflow.lastRunAt,
         }))
     );
-});
+})
 
-app.get("/:id",async (c)=>{
+.get("/:id",async (c)=>{
     const id=c.req.param("id")
     const userId=c.get("user").id
     const workflow=await prisma.workflow.findFirst({
@@ -127,7 +125,7 @@ app.get("/:id",async (c)=>{
     return c.json({ workflow });
 })
 
-app.delete("/:id", async (c) => {
+.delete("/:id", async (c) => {
     const id = c.req.param("id");
     const userId = c.get("user").id;
     const result = await prisma.workflow.deleteMany({
@@ -139,9 +137,9 @@ app.delete("/:id", async (c) => {
     }
 
     return c.body(null, 204);
-});
+})
 
-app.post("/create",zValidator("json",createWorkflowInputSchema,validationHook),async(c)=>{
+.post("/create",zValidator("json",createWorkflowInputSchema,validationHook),async(c)=>{
     const body=c.req.valid("json")
     const userId=c.get("user").id
 
@@ -204,7 +202,7 @@ app.post("/create",zValidator("json",createWorkflowInputSchema,validationHook),a
     return c.json({workflow},201)
 })
 
-app.post("/update",zValidator("json",updateWorkflowInputSchema,validationHook),async(c)=>{
+.post("/update",zValidator("json",updateWorkflowInputSchema,validationHook),async(c)=>{
     const input=c.req.valid("json")
     const userId=c.get("user").id
 
@@ -294,7 +292,7 @@ app.post("/update",zValidator("json",updateWorkflowInputSchema,validationHook),a
     return c.json({workflow},200)
 })
 
-app.post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook),async(c)=>{
+.post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook),async(c)=>{
     const input=c.req.valid("json")
     const userId=c.get("user").id
     if (input.nodeId && (input.triggerSource || input.triggerNodeId)) {
@@ -509,9 +507,9 @@ app.post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook)
         workflowId: input.workflowId,
         ...(stream ? { stream } : {}),
     });
-});
+})
 
-app.get("/runs",async(c)=>{
+.get("/runs",async(c)=>{
     const input=workflowRunsInputSchema.parse(c.req.query())
     const userId=c.get("user").id
     const workflowRuns=await prisma.workflowRun.findMany({
@@ -544,9 +542,9 @@ app.get("/runs",async(c)=>{
         source: getRunSource(run.metadata),
     }));
     return c.json({ workflowRuns: hydratedworkflowRuns, nextCursor });
-});
+})
 
-app.get("/workflow/run/:id",async(c)=>{
+.get("/workflow/run/:id",async(c)=>{
     const runId=c.req.param("id")
     const run = await prisma.workflowRun.findUnique({
         where: { id: runId },
