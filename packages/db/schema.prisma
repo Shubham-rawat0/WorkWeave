@@ -22,8 +22,21 @@ model User {
   credentials     Credentials[]
   usageRecords    UsageRecord[]
   sessions        Session[]
+  passwordResetTokens PasswordResetToken[]
   provider        String
   password          String?
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Session {
