@@ -1,4 +1,4 @@
-import { hc, type ClientResponse, type InferResponseType } from "hono/client";
+import { hc, type ClientResponse } from "hono/client";
 import type { AppType } from "@WorkOrchestrator/api";
 
 export const API_URL =
@@ -6,18 +6,65 @@ export const API_URL =
 
 export const GOOGLE_AUTH_URL = `${API_URL}/api/v1/auth/google`;
 
+type RpcResponse = Promise<ClientResponse<unknown>>;
+type JsonRequest = (args: { json: Record<string, unknown> }) => RpcResponse;
+type DeleteSessionRequest = (args: { param: { id: string } }) => RpcResponse;
+
+type ApiClient = {
+    auth: {
+        me: { $get: () => RpcResponse };
+        signin: { $post: JsonRequest };
+        signup: { $post: JsonRequest };
+        "change-password": { $post: JsonRequest };
+        "forgot-password": {
+            request: { $post: JsonRequest };
+            reset: { $post: JsonRequest };
+        };
+        profile: { $patch: JsonRequest };
+        sessions: {
+            $get: () => RpcResponse;
+            $delete: () => RpcResponse;
+            ":id": { $delete: DeleteSessionRequest };
+        };
+        signout: { $post: () => RpcResponse };
+    };
+    workflow: { index: { $get: () => RpcResponse } };
+};
+
 const client = hc<AppType>(`${API_URL}/api/v1`, {
     init: { credentials: "include" },
-});
+}) as unknown as ApiClient;
 
-export type User = InferResponseType<typeof client.auth.me.$get>["user"];
-export type WorkflowSummary =
-    InferResponseType<typeof client.workflow.index.$get>[number];
-export type SessionInfo =
-    InferResponseType<typeof client.auth.sessions.$get>["sessions"][number];
-export type WorkflowStatus = WorkflowSummary["lastRunStatus"];
+export type User = {
+    id: string;
+    name: string;
+    email: string;
+    image: string | null;
+    provider: string;
+};
 
-async function unwrap<T>(request: Promise<ClientResponse<T>>): Promise<T> {
+export type WorkflowStatus = "Success" | "Failure" | "Pending";
+export type WorkflowSummary = {
+    id: string;
+    title: string;
+    createdAt: string;
+    updatedAt: string;
+    nodeCount: number;
+    edgeCount: number;
+    lastRunStatus: WorkflowStatus | null;
+    lastRunAt: string | null;
+};
+
+export type SessionInfo = {
+    id: string;
+    ipAddress: string | null;
+    userAgent: string | null;
+    createdAt: string;
+    expiresAt: string;
+    current: boolean;
+};
+
+async function unwrap<T>(request: RpcResponse): Promise<T> {
     const res = (await request) as unknown as Response & {
         json(): Promise<T>;
     };
@@ -31,29 +78,30 @@ async function unwrap<T>(request: Promise<ClientResponse<T>>): Promise<T> {
 }
 
 export const api = {
-    me: () => unwrap(client.auth.me.$get()),
+    me: () => unwrap<{ user: User }>(client.auth.me.$get()),
     signin: (body: { email: string; password: string }) =>
-        unwrap(client.auth.signin.$post({ json: body })),
+        unwrap<{ message: string; user: User }>(client.auth.signin.$post({ json: body })),
     signup: (body: { name: string; email: string; password: string }) =>
-        unwrap(client.auth.signup.$post({ json: body })),
+        unwrap<{ message: string; user: User }>(client.auth.signup.$post({ json: body })),
     changePassword: (body: {
         currentPassword: string;
         newPassword: string;
         logoutOtherDevices?: boolean;
-    }) => unwrap(client.auth["change-password"].$post({ json: body })),
+    }) => unwrap<{ message: string; revokedSessions: number }>(client.auth["change-password"].$post({ json: body })),
     requestPasswordReset: (body: { email: string }) =>
-        unwrap(client.auth["forgot-password"].request.$post({ json: body })),
+        unwrap<{ message: string }>(client.auth["forgot-password"].request.$post({ json: body })),
     resetPassword: (body: {
         email: string;
         otp: string;
         newPassword: string;
-    }) => unwrap(client.auth["forgot-password"].reset.$post({ json: body })),
+    }) => unwrap<{ message: string }>(client.auth["forgot-password"].reset.$post({ json: body })),
     updateProfile: (body: { name: string; image?: string }) =>
-        unwrap(client.auth.profile.$patch({ json: body })),
-    sessions: () => unwrap(client.auth.sessions.$get()),
+        unwrap<{ message: string; user: User }>(client.auth.profile.$patch({ json: body })),
+    sessions: () => unwrap<{ sessions: SessionInfo[] }>(client.auth.sessions.$get()),
     revokeSession: (id: string) =>
-        unwrap(client.auth.sessions[":id"].$delete({ param: { id } })),
-    revokeOtherSessions: () => unwrap(client.auth.sessions.$delete()),
-    signout: () => unwrap(client.auth.signout.$post()),
-    workflows: () => unwrap(client.workflow.index.$get()),
+        unwrap<{ message: string }>(client.auth.sessions[":id"].$delete({ param: { id } })),
+    revokeOtherSessions: () =>
+        unwrap<{ message: string; revokedSessions: number }>(client.auth.sessions.$delete()),
+    signout: () => unwrap<{ message: string }>(client.auth.signout.$post()),
+    workflows: () => unwrap<WorkflowSummary[]>(client.workflow.index.$get()),
 };

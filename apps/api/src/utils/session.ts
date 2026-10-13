@@ -148,3 +148,70 @@ export async function rotateSession(
 
     await createSession(c, userId);
 }
+
+function getCurrentSessionHash(c: Context): string | null {
+    const token = getSessionCookie(c);
+    return token ? getHashToken(token) : null;
+}
+
+export interface SessionInfo {
+    id: string;
+    ipAddress: string | null;
+    userAgent: string | null;
+    createdAt: Date;
+    expiresAt: Date;
+    current: boolean;
+}
+
+/** Lists every session for a user, flagging the one making the request. */
+export async function listSessions(
+    c: Context,
+    userId: string,
+): Promise<SessionInfo[]> {
+    const currentHash = getCurrentSessionHash(c);
+
+    const sessions = await prisma.session.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        select: {
+            id: true,
+            hashToken: true,
+            ipAddress: true,
+            userAgent: true,
+            createdAt: true,
+            expiresAt: true,
+        },
+    });
+
+    return sessions.map(({ hashToken, ...session }) => ({
+        ...session,
+        current: currentHash !== null && hashToken === currentHash,
+    }));
+}
+
+/** Revokes a single session, scoped to the owning user. Returns true when removed. */
+export async function revokeSession(
+    userId: string,
+    sessionId: string,
+): Promise<boolean> {
+    const result = await prisma.session.deleteMany({
+        where: { id: sessionId, userId },
+    });
+    return result.count > 0;
+}
+
+/** Revokes every session for a user except the one making the request. */
+export async function revokeOtherSessions(
+    c: Context,
+    userId: string,
+): Promise<number> {
+    const currentHash = getCurrentSessionHash(c);
+
+    const result = await prisma.session.deleteMany({
+        where: {
+            userId,
+            ...(currentHash ? { hashToken: { not: currentHash } } : {}),
+        },
+    });
+    return result.count;
+}

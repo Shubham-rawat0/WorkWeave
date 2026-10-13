@@ -29,6 +29,7 @@ export const SigninSchema = z.object({
 export const ChangePasswordSchema = z.object({
     currentPassword: z.string().min(1, "Current password is required"),
     newPassword: password,
+    logoutOtherDevices: z.boolean().optional().default(false),
 });
 
 export const ForgotPasswordRequestSchema = z.object({ email });
@@ -41,4 +42,12 @@ export const ForgotPasswordResetSchema = z.object({
 
 export const UpdateProfileSchema = z.object({
     name: z.string().trim().min(1, "Name is required").max(100, "Name must be at most 100 characters"),
+    image: z
+        .string()
+        .trim()
+        .max(2048, "Image URL is too long")
+        .refine((value) => value === "" || /^https?:\/\/\S+$/i.test(value), {
+            message: "Enter a valid image URL",
+        })
+        .optional(),
 });

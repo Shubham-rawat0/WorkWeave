@@ -74,10 +74,12 @@ app.onError((err, c) => {
     );
 });
 
-app.route("/api/v1/auth", auth);
+
 
 app.use("/api/v1/workflow/*", authMiddleware);
-app.route("/api/v1/workflow", workflow);
-
 app.use("/api/v1/cred/*",authMiddleware)
-app.route("/api/v1/cred",credentials)
+app.route("/api/v1/auth", auth)
+    .route("/api/v1/workflow", workflow)
+    .route("/api/v1/credentials", credentials);
+
+export type AppType = typeof app

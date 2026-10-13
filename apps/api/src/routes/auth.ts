@@ -15,17 +15,26 @@ import {
     setOAuthStateCookie,
 } from "../lib/google";
 import { validationHook } from "../lib/validator";
-import { createSession, getSessionUser, invalidateSession, rotateSession } from "../utils/session";
+import {
+    createSession,
+    getSessionUser,
+    invalidateSession,
+    listSessions,
+    revokeOtherSessions,
+    revokeSession,
+    rotateSession,
+} from "../utils/session";
 import { createRateLimiter } from "../middleware/rateLimit";
 import { authMiddleware } from "../middleware/auth";
 import { isSmtpConfigured, sendPasswordResetCode } from "../lib/email";
 
-const app = new Hono();
+const app = new Hono()
 
 const userSelect = {
     id: true,
     name: true,
     email: true,
+    image: true,
     provider: true,
 } as const;
 
@@ -41,21 +50,38 @@ app.post(
     createRateLimiter(5, 60_000),
     zValidator("json", ChangePasswordSchema, validationHook),
     async (c) => {
-        const { currentPassword, newPassword } = c.req.valid("json");
+        const { currentPassword, newPassword, logoutOtherDevices } = c.req.valid("json");
         const user = await prisma.user.findUnique({ where: { id: c.get("user").id } });
         if (!user || user.provider !== "credentials" || !user.password ||
             !(await comparePassword(currentPassword, user.password))) {
             throw new HTTPException(400, { message: "Current password is incorrect" });
         }
+        if (await comparePassword(newPassword, user.password)) {
+            throw new HTTPException(400, { message: "New password must be different from the current password" });
+        }
         await prisma.user.update({
             where: { id: user.id },
             data: { password: await hashPassword(newPassword) },
         });
-        return c.json({ message: "Password updated successfully" }, 200);
-    },
-);
 
-app.post(
+        let revokedSessions = 0;
+        if (logoutOtherDevices) {
+            revokedSessions = await revokeOtherSessions(c, user.id);
+        }
+
+        return c.json(
+            {
+                message: logoutOtherDevices
+                    ? "Password updated. Other devices have been signed out."
+                    : "Password updated successfully",
+                revokedSessions,
+            },
+            200,
+        );
+    },
+)
+
+.post(
     "/forgot-password/request",
     createRateLimiter(3, 60_000),
     zValidator("json", ForgotPasswordRequestSchema, validationHook),
@@ -82,9 +108,9 @@ app.post(
         }
         return c.json({ message: "If an account can be reset, a code has been sent" }, 200);
     },
-);
+)
 
-app.post(
+.post(
     "/forgot-password/reset",
     createRateLimiter(5, 60_000),
     zValidator("json", ForgotPasswordResetSchema, validationHook),
@@ -116,24 +142,54 @@ app.post(
         });
         return c.json({ message: "Password reset successfully. Please sign in." }, 200);
     },
-);
+)
 
-app.patch(
+.patch(
     "/profile",
     authMiddleware,
+    createRateLimiter(20, 60_000),
     zValidator("json", UpdateProfileSchema, validationHook),
     async (c) => {
-        const { name } = c.req.valid("json");
+        const { name, image } = c.req.valid("json");
         const user = await prisma.user.update({
             where: { id: c.get("user").id },
-            data: { name },
+            data: {
+                name,
+                ...(image === undefined ? {} : { image: image === "" ? null : image }),
+            },
             select: userSelect,
         });
         return c.json({ message: "Profile updated successfully", user }, 200);
     },
-);
+)
 
-app.post(
+.get(
+    "/sessions",
+    authMiddleware,
+    createRateLimiter(60, 60_000),
+    async (c) => {
+        const sessions = await listSessions(c, c.get("user").id);
+        return c.json({ sessions }, 200);
+    },
+)
+
+.delete("/sessions", authMiddleware, async (c) => {
+    const count = await revokeOtherSessions(c, c.get("user").id);
+    return c.json(
+        { message: "Signed out of all other devices", revokedSessions: count },
+        200,
+    );
+})
+
+.delete("/sessions/:id", authMiddleware, async (c) => {
+    const revoked = await revokeSession(c.get("user").id, c.req.param("id"));
+    if (!revoked) {
+        throw new HTTPException(404, { message: "Session not found" });
+    }
+    return c.json({ message: "Session revoked successfully" }, 200);
+})
+
+.post(
     "/signup", createRateLimiter(5, 60_000),
     zValidator("json", SignupSchema, validationHook),
     async (c) => {
@@ -186,9 +242,9 @@ app.post(
             201,
         );
     },
-);
+)
 
-app.post(
+.post(
     "/signin",
     createRateLimiter(5, 60_000),
     zValidator("json", SigninSchema, validationHook),
@@ -227,15 +283,16 @@ app.post(
                     id: user.id,
                     name: user.name,
                     email: user.email,
+                    image: user.image,
                     provider: user.provider,
                 },
             },
             200,
         );
     },
-);
+)
 
-app.post("/signout", async (c) => {
+.post("/signout", async (c) => {
     await invalidateSession(c);
 
     return c.json(
@@ -244,9 +301,9 @@ app.post("/signout", async (c) => {
         },
         200,
     );
-});
+})
 
-app.get("/me", createRateLimiter(60, 60_000), async (c) => {
+.get("/me", createRateLimiter(60, 60_000), async (c) => {
     const user = await getSessionUser(c);
 
     if (!user) {
@@ -256,9 +313,9 @@ app.get("/me", createRateLimiter(60, 60_000), async (c) => {
     }
 
     return c.json({ user }, 200);
-});
+})
 
-app.get("/google", createRateLimiter(10, 60_000), async (c) => {
+.get("/google", createRateLimiter(10, 60_000), async (c) => {
     const client = getGoogleOAuthClient();
 
     const state = generateSessionToken();
@@ -278,9 +335,9 @@ app.get("/google", createRateLimiter(10, 60_000), async (c) => {
     });
 
     return c.redirect(authorizationUrl);
-});
+})
 
-app.get("/google/callback", async (c) => {
+.get("/google/callback", async (c) => {
     const storedState = getOAuthStateCookie(c);
     clearOAuthStateCookie(c);
 

@@ -22,7 +22,7 @@ function encrypt(secret:string):string{
   encrypted=Buffer.concat([encrypted,cipher.final()])
   const tag=cipher.getAuthTag()
   const packed=Buffer.concat([iv,tag,encrypted])
-  return packed.toBase64()
+  return packed.toString("base64")
 }
 
 function decrypt(plainText:string):string{
