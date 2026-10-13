@@ -54,6 +54,14 @@ export const api = {
             method: "POST",
             body,
         }),
+    changePassword: (body: { currentPassword: string; newPassword: string }) =>
+        request<{ message: string }>("/api/v1/auth/change-password", { method: "POST", body }),
+    requestPasswordReset: (body: { email: string }) =>
+        request<{ message: string }>("/api/v1/auth/forgot-password/request", { method: "POST", body }),
+    resetPassword: (body: { email: string; otp: string; newPassword: string }) =>
+        request<{ message: string }>("/api/v1/auth/forgot-password/reset", { method: "POST", body }),
+    updateProfile: (body: { name: string }) =>
+        request<{ message: string; user: User }>("/api/v1/auth/profile", { method: "PATCH", body }),
     signout: () =>
         request<{ message: string }>("/api/v1/auth/signout", {
             method: "POST",

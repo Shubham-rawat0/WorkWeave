@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Instrument_Serif } from "next/font/google";
+import { Instrument_Serif, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const display = Instrument_Serif({
   subsets: ["latin"],
@@ -21,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={display.variable}>
+    <html lang="en" className={cn("font-sans", geist.variable)}>
       <body>{children}</body>
     </html>
   );

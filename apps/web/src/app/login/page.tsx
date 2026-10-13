@@ -89,6 +89,12 @@ export default function SignInPage() {
           />
         </div>
 
+        <div className="-mt-1 text-right">
+          <Link href="/forgot-password" className="text-sm text-[#F04D26] hover:text-[#E63D00]">
+            Forgot password?
+          </Link>
+        </div>
+
         <PrimaryButton type="submit" isLoading={isLoading}>
           Continue
         </PrimaryButton>
