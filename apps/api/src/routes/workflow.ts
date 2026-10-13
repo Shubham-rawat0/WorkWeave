@@ -3,11 +3,11 @@ import type { User } from "../schemas/types";
 import { createRateLimiter } from "../middleware/rateLimit";
 import { prisma, Prisma, type WorkflowStatus } from "@WorkOrchestrator/prisma";
 import { HTTPException } from "hono/http-exception";
-import { createWorkflowInputSchema, executeWorkflowInputSchema, EXECUTION_STREAM_TOKEN_TTL_SECONDS, updateWorkflowInputSchema } from "../schemas/workflow";
+import { createWorkflowInputSchema, executeWorkflowInputSchema, EXECUTION_STREAM_TOKEN_TTL_SECONDS, updateWorkflowInputSchema, workflowRunsInputSchema } from "../schemas/workflow";
 import { zValidator } from "@hono/zod-validator";
 import { validationHook } from "../lib/validator";
 import { RunReservationLockTimeoutError, withUserRunReservationLock } from "@WorkOrchestrator/shared/runLock";
-import { validateWorkflowGraph } from "../lib/workflow";
+import { getRunSource, validateWorkflowGraph } from "../lib/workflow";
 import { getWorkflowQueue } from "@WorkOrchestrator/shared/queue";
 import { resolveExecutionStreamSigningSecret, resolveExecutionStreamWsBaseUrlFromEnv } from "../lib/ws";
 import { signExecutionStreamToken } from "@WorkOrchestrator/shared/executionSignature";
@@ -511,4 +511,74 @@ app.post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook)
     });
 });
 
+app.get("/workflow/runs",async(c)=>{
+    const input=workflowRunsInputSchema.parse(c.req.query())
+    const workflowRuns=await prisma.workflowRun.findMany({
+        where:{
+            workflowId:input.workflowId
+        },
+        include: {
+            workflow: { select: { id: true, title: true } },
+            nodeRuns: { select: { id: true, status: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: input.limit + 1,
+        ...(input.cursor && {
+            cursor: { id: input.cursor },
+            skip: 1,
+        }),
+    })
+
+    let nextCursor: string | undefined;
+
+    if (workflowRuns.length > input.limit) {
+        workflowRuns.pop();
+
+        nextCursor = workflowRuns[workflowRuns.length - 1]?.id;
+    }
+    const hydratedworkflowRuns = workflowRuns.map((run) => ({
+        ...run,
+        source: getRunSource(run.metadata),
+    }));
+    return c.json({ workflowRuns: hydratedworkflowRuns, nextCursor });
+});
+
+app.get("/workflow/run/:id",async(c)=>{
+    const runId=c.req.param("id")
+    const run = await prisma.workflowRun.findUnique({
+        where: { id: runId },
+        include: {
+            workflow: {
+                select: {
+                    id: true,
+                    title: true,
+                    userId: true,
+                    nodes: true,
+                    edges: true,
+                },
+            },
+            nodeRuns: {
+                orderBy: { startedAt: "asc" },
+            },
+        },
+    });
+    if (!run) {
+        throw new HTTPException(
+            403,
+            {message: "Execution not found",
+        });
+    }
+    const userId=c.get("user").id
+
+    if (run.workflow.userId !== userId) {
+        throw new HTTPException(
+            401,
+            {message: "Not authorized to view this execution",
+        });
+    }
+    return c.json({
+        ...run,
+        source: getRunSource(run.metadata),
+    });
+});
 export default app

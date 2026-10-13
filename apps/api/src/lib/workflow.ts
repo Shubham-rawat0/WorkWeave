@@ -106,3 +106,13 @@ export function validateWorkflowGraph(
 
     return errors;
 }
+
+export function getRunSource(metadata: unknown): string | null {
+    if (!metadata || typeof metadata !== "object") return null;
+    const source = (
+        metadata as {
+            source?: unknown;
+        }
+    ).source;
+    return typeof source === "string" ? source : null;
+}

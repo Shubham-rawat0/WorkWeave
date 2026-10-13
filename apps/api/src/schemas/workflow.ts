@@ -61,3 +61,10 @@ export const executeWorkflowInputSchema = z.object({
     triggerSource: z.enum(["cron", "webhook"]).optional(),
     triggerNodeId: z.string().optional(),
 })
+
+export const workflowRunsInputSchema =z.object({
+    workflowId: z.string(),
+    status: z.enum(["Pending", "Success", "Failure"]).optional(),
+    limit: z.coerce.number().min(1).max(50).default(20),
+    cursor: z.string().optional(),
+});
