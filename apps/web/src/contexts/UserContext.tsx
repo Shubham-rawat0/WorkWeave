@@ -7,6 +7,7 @@ export interface UserContextValue {
   user: User;
   signOut: () => void;
   isSigningOut: boolean;
+  refresh: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextValue | null>(null);

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, type CSSProperties } from "react"
+import type { CSSProperties } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import {
   ActivityIcon,
@@ -33,11 +34,11 @@ import { cn } from "@/lib/utils"
 import type { User } from "@/lib/api"
 
 const NAV_ITEMS: { title: string; href: string; icon: LucideIcon }[] = [
-  { title: "Home", href: "#", icon: LayoutDashboardIcon },
-  { title: "Workflows", href: "#", icon: WorkflowIcon },
-  { title: "Executions", href: "#", icon: ActivityIcon },
-  { title: "Credentials", href: "#", icon: KeySquareIcon },
-  { title: "Account", href: "#", icon: UserRoundIcon },
+  { title: "Dashboard", href: "/home", icon: LayoutDashboardIcon },
+  { title: "Workflows", href: "/home/workflows", icon: WorkflowIcon },
+  { title: "Executions", href: "/home/executions", icon: ActivityIcon },
+  { title: "Credentials", href: "/home/credentials", icon: KeySquareIcon },
+  { title: "Account", href: "/home/account", icon: UserRoundIcon },
 ]
 
 export const SIDEBAR_THEME = {
@@ -108,7 +109,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ user, onSignOut }: AppSidebarProps) {
-  const [active, setActive] = useState<string>(NAV_ITEMS[0]?.title ?? "")
+  const pathname = usePathname()
 
   return (
     <Sidebar
@@ -140,24 +141,20 @@ export function AppSidebar({ user, onSignOut }: AppSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               {NAV_ITEMS.map((item) => {
-                const isActive = active === item.title
+                const isActive =
+                  item.href === "/home"
+                    ? pathname === "/home"
+                    : pathname.startsWith(item.href)
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      render={
-                        <a
-                          href={item.href}
-                          onClick={(event) => {
-                            event.preventDefault()
-                            setActive(item.title)
-                          }}
-                        />
-                      }
+                      render={<Link href={item.href} />}
+                      isActive={isActive}
                       tooltip={item.title}
                       className={`relative h-10 transition-colors duration-200 ${
                         isActive
                           ? "text-white"
-                          : "text-[var(--nav-text)] hover:text-white"
+                          : "text-[#87867c] hover:text-white"
                       }`}
                     >
                       {isActive && (

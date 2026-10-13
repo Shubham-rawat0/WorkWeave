@@ -11,6 +11,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@WorkOrchestrator/api": "workspace:*",
     "@base-ui/react": "^1.9.0",
     "@radix-ui/react-collapsible": "^1.1.21",
     "@radix-ui/react-scroll-area": "^1.2.0",
@@ -18,6 +19,7 @@
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "framer-motion": "^14.1.0",
+    "hono": "^4.13.13",
     "lucide-react": "^1.54.0",
     "next": "^16.4.0",
     "react": "^19.3.0",
