@@ -1,0 +1,17 @@
+{
+  "name": "@WorkOrchestrator/websocket",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/ws": "^8.18.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "ws": "^8.22.0",
+    "@WorkOrchestrator/shared": "workspace:*"
+    }
+}
