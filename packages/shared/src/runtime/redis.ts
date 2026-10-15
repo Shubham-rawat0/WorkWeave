@@ -1,8 +1,20 @@
 import Redis, { type RedisOptions } from "ioredis";
 
+type RedisConnectionOptions = Pick<
+    RedisOptions,
+    | "host"
+    | "port"
+    | "username"
+    | "password"
+    | "db"
+    | "maxRetriesPerRequest"
+    | "lazyConnect"
+    | "tls"
+>;
+
 const redisErrorLogTimestamps = new Map<string, number>();
 
-const commonRedisOptions: RedisOptions = {
+const commonRedisOptions: RedisConnectionOptions = {
     maxRetriesPerRequest: null,
     lazyConnect: true,
 };
@@ -20,7 +32,7 @@ function parseRedisPort(value: string | undefined, fallback: number): number {
     return parsed;
 }
 
-function parseRedisUrl(url: string): RedisOptions {
+function parseRedisUrl(url: string): RedisConnectionOptions {
     const parsed = new URL(url);
     if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:") {
         throw new Error(
@@ -29,7 +41,7 @@ function parseRedisUrl(url: string): RedisOptions {
     }
     const isTls = parsed.protocol === "rediss:";
 
-    const options: RedisOptions = {
+    const options: RedisConnectionOptions = {
         ...commonRedisOptions,
         host: parsed.hostname,
         port: parseRedisPort(parsed.port || undefined, isTls ? 443 : 6379),
@@ -54,7 +66,7 @@ function parseRedisUrl(url: string): RedisOptions {
     return options;
 }
 
-export function getRedisConnectionOptions(): RedisOptions {
+export function getRedisConnectionOptions(): RedisConnectionOptions {
     const redisUrl = process.env.REDIS_URL?.trim() || process.env.UPSTASH_REDIS_URL?.trim();
     if (redisUrl) {
         const configuredFrom = process.env.REDIS_URL?.trim()

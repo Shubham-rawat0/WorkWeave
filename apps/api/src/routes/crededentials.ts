@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import type { Variables } from "hono/types";
 import type { User } from "../schemas/types";
 import { zValidator } from "@hono/zod-validator";
 import { createCredentialsInputSchema, UpdateCredentialsInputSchema } from "../schemas/credentiaks";

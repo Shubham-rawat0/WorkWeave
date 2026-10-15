@@ -1,7 +1,7 @@
 import { Queue, type QueueOptions } from "bullmq";
 import { getRedisConnectionOptions } from "./redis";
 
-const queueName = "workflow-runs";
+export const queueName = "workflow-runs";
 
 let workflowQueueInstance: Queue | null = null;
 
@@ -17,7 +17,7 @@ const defaultJobOptions: NonNullable<QueueOptions["defaultJobOptions"]> = {
 
 function createQueueOptions():QueueOptions{
     return {
-        connection:getRedisConnectionOptions,
+        connection:getRedisConnectionOptions(),
         defaultJobOptions
     }
 }
@@ -26,7 +26,7 @@ export function getWorkflowQueue():Queue{
     if (workflowQueueInstance){
         return workflowQueueInstance
     }
-    workflowQueueInstance=new Queue("workflow",createQueueOptions())
+    workflowQueueInstance=new Queue(queueName,createQueueOptions())
     return workflowQueueInstance
 }
 
