@@ -10,7 +10,9 @@
       "typescript": "^5"
    },
    "dependencies": {
+      "@WorkOrchestrator/prisma": "workspace:*",
+      "@WorkOrchestrator/shared": "workspace:*",
       "bullmq": "^6.3.15",
-      "@WorkOrchestrator/shared": "workspace:*"
+      "zod": "^4.6.7"
    }
 }
