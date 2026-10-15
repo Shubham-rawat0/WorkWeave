@@ -1,7 +1,8 @@
 import Redis, { type RedisOptions } from "ioredis";
+import type { RedisOptions as BullRedisOptions } from "bullmq";
 
 type RedisConnectionOptions = Pick<
-    RedisOptions,
+    BullRedisOptions,
     | "host"
     | "port"
     | "username"
