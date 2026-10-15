@@ -15,10 +15,24 @@ type RedisConnectionOptions = Pick<
 
 const redisErrorLogTimestamps = new Map<string, number>();
 
+type RedisFallbackFactory<T> = () => T | Promise<T>;
+
+const REDIS_CONNECT_ERROR_CODES = new Set([
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ETIMEDOUT",
+    "ECONNRESET",
+    "EHOSTUNREACH",
+    "NR_CLOSED",
+]);
+
+
 const commonRedisOptions: RedisConnectionOptions = {
     maxRetriesPerRequest: null,
     lazyConnect: true,
 };
+const fallbackLogTimestamps = new Map<string, number>();
 
 let mainRedisClient: Redis | null = null;
 
@@ -90,6 +104,69 @@ export function getRedisConnectionOptions(): RedisConnectionOptions {
     };
 }
 
+function isConnectionMessage(message: string): boolean {
+    const lowered = message.toLowerCase();
+    return (
+        lowered.includes("connection is closed") ||
+        lowered.includes("connect econnrefused") ||
+        lowered.includes("connect etimedout") ||
+        lowered.includes("getaddrinfo enotfound") ||
+        lowered.includes("socket closed")
+    );
+}
+
+function getNestedErrors(error: unknown): unknown[] {
+    if (!error || typeof error !== "object") {
+        return [];
+    }
+
+    const maybeErrors = (error as { errors?: unknown }).errors;
+    if (Array.isArray(maybeErrors)) {
+        return maybeErrors;
+    }
+
+    return [];
+}
+
+
+function getErrorCode(error: unknown): string | null {
+    if (!error || typeof error !== "object") {
+        return null;
+    }
+    const maybeCode = (error as { code?: unknown }).code;
+    if (typeof maybeCode !== "string") {
+        return null;
+    }
+    return maybeCode;
+}
+
+export function isRedisConnectionError(error: unknown): boolean {
+    const code = getErrorCode(error);
+    if (code && REDIS_CONNECT_ERROR_CODES.has(code)) {
+        return true;
+    }
+
+    const nestedErrors = getNestedErrors(error);
+    if (
+        nestedErrors.length > 0 &&
+        nestedErrors.some((nestedError) => isRedisConnectionError(nestedError))
+    ) {
+        return true;
+    }
+
+    if (error && typeof error === "object" && "cause" in error) {
+        const cause = (error as { cause?: unknown }).cause;
+        if (cause && isRedisConnectionError(cause)) {
+            return true;
+        }
+    }
+
+    if (error instanceof Error) {
+        return isConnectionMessage(error.message);
+    }
+    return false;
+}
+
 function logThrottledWarning(
     store: Map<string, number>,
     key: string,
@@ -115,6 +192,28 @@ function attachRedisErrorLogging(client: Redis, label: string): void {
             `[redis:${label}] unavailable: ${reason}`,
         );
     });
+}
+
+export async function withRedisFallback<T>(
+    context: string,
+    operation: () => Promise<T>,
+    fallback: RedisFallbackFactory<T>,
+): Promise<T> {
+    
+    try {
+        return await operation();
+    } catch (error) {
+        if (!isRedisConnectionError(error)) {
+            throw error;
+        }
+        const reason = error instanceof Error ? error.message : String(error);
+        logThrottledWarning(
+            fallbackLogTimestamps,
+            `${context}:${reason}`,
+            `[redis-fallback:${context}] ${reason}`,
+        );
+        return await fallback();
+    }
 }
 
 function createRedisClient(label:string):Redis{
