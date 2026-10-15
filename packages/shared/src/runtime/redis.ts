@@ -105,7 +105,7 @@ function attachRedisErrorLogging(client: Redis, label: string): void {
 }
 
 function createRedisClient(label:string):Redis{
-    const client=new Redis(getRedisConnectionOptions())
+    const client=new Redis(getRedisConnectionOptions() as RedisOptions & { replyMapping?: "legacy" })
     attachRedisErrorLogging(client,label)
     return client
 }

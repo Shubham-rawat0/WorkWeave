@@ -6,7 +6,7 @@ import { Duplex } from "node:stream";
 import { ExecutionStreamTokenPayload, verifyExecutionStreamToken } from "@WorkOrchestrator/shared/executionSignature";
 import { CreateRedisSubscriber } from "@WorkOrchestrator/shared/redis";
 
-config({path:resolve(...process.cwd(),"../../.env")})
+config({ path: resolve(process.cwd(), "../../.env") })
 
 const host = process.env.REALTIME_HOST?.trim() || "::";
 const port = Number.parseInt(
@@ -45,7 +45,7 @@ const server=http.createServer((req,res)=>{
     res.end(JSON.stringify({ error: "Not found" }));
 })
 
-const wss=new WebSocketServer({noServer:true})
+const wss=new WebSocketServer({noServer:true,maxPayload:1024*1024})
 
 function sendJSON(ws:Websocket,payload:Record<string,unknown>):void{
     if (ws.readyState===ws.OPEN){
@@ -60,7 +60,7 @@ function closeHTTPupgrade(socket:Duplex,statusCode:number,reason:string):void{
             : statusCode === 404
                 ? "Not Found"
                 : "Bad Request";
-    socket.write(  //duplex stream to read and write provided by node
+    socket.end(  //duplex stream to read and write provided by node
         `HTTP/1.1 ${statusCode} ${statusText}\r\n` +
         "Connection: close\r\n" +
         "Content-Type: text/plain\r\n" +
@@ -68,7 +68,6 @@ function closeHTTPupgrade(socket:Duplex,statusCode:number,reason:string):void{
         "\r\n" +
         reason,
     );
-    socket.destroy();
 }
 
 //http connection upgrading to WS
@@ -124,7 +123,19 @@ server.on("upgrade",(req,socket,head)=>{
 
 wss.on("connection",(ws:Websocket,payload:ExecutionStreamTokenPayload)=>{
     const channel = `workflow-run:${payload.runId}`
-    const subscriber=CreateRedisSubscriber()
+    let subscriber: ReturnType<typeof CreateRedisSubscriber>
+    try {
+        subscriber = CreateRedisSubscriber()
+    } catch (error) {
+        sendJSON(ws, {
+            type: "socket",
+            status: "subscription_error",
+            error:
+                error instanceof Error ? error.message : "Unknown redis error",
+        })
+        ws.close(1011, "Redis unavailable")
+        return
+    }
     let closed = false;
     let pingTimer: ReturnType<typeof setInterval> | null = null;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
