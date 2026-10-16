@@ -1,6 +1,7 @@
 import { prisma } from "@WorkOrchestrator/prisma";
 import { decryptJson } from "@WorkOrchestrator/shared/crypto";
 
+
 export interface ResolvedCredential {
     platform: string;
     keys: Record<string, string>;
@@ -11,7 +12,8 @@ export type CredentialPlatform =
     | "anthropic"
     | "gemini"
     | "github"
-    | "notion";
+    | "notion"
+    | "slack";
 
 export async function resolveCredentials(credentialId:string,userId:string):Promise<ResolvedCredential>{
     const cred=await prisma.credentials.findFirst({
@@ -34,7 +36,7 @@ export async function resolveCredentials(credentialId:string,userId:string):Prom
     }
 }   
 
-export async function getCredential(
+export async function resolveCredentialByPlatform(
     ownerUserId: string,
     platform: CredentialPlatform,
 ): Promise<ResolvedCredential | null> {
