@@ -31,8 +31,16 @@
       "default": "./src/runtime/executionSignature.ts"
     },
     "./crypto": {
-      "types": "./src/crypto.ts",
-      "default": "./src/crypto.ts"
+      "types": "./src/security/crypto.ts",
+      "default": "./src/security/crypto.ts"
+    },
+    "./ssrf": {
+      "types": "./src/security/ssrf.ts",
+      "default": "./src/security/ssrf.ts"
+    },
+    "./parser": {
+      "types": "./src/parser/parser.ts",
+      "default": "./src/parser/parser.ts"
     }
   },
   "dependencies": {
