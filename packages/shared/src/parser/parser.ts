@@ -56,6 +56,8 @@ function resolvePath(values: Record<string, any>, keys: string[]): any {
 /**
  * Renders `template` and reports which placeholders could not be resolved.
  * Delimiters are treated as single characters.
+ * 
+ * maps expression to values
  */
 export function parseTemplateWithMetadata(
     template: string,

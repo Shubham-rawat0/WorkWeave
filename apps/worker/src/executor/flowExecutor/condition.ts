@@ -41,7 +41,8 @@ function matchesRule(value: string, rule: Rule): boolean {
         case "equals":
             return value===comparison
         case "not_equals":
-            return value===comparison
+            // Negated match: previously duplicated the "equals" branch.
+            return value!==comparison
         case "contains":
             return value.includes(comparison)
         default:

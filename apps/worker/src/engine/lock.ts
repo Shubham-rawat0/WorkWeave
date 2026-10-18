@@ -1,5 +1,5 @@
 import { prisma } from "@WorkOrchestrator/prisma";
-import { getMainRedisClient, Redis, withRedisFallback } from "@WorkOrchestrator/shared/redis";
+import { getMainRedisClient, withRedisFallback } from "@WorkOrchestrator/shared/redis";
 
 export const LOCK_TTL_SECONDS = 5 * 60;
 const LOCK_COMPARE_ATTEMPTS = 3;
