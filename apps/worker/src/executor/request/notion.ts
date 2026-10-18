@@ -246,7 +246,7 @@ async function looksLikeNotionPageIdTarget(targetId: string,
     const endpoint = `${NOTION_BASE_URL}/pages/${encodeURIComponent(targetId)}`;
     try {
         await validateOutboundUrl(endpoint)
-    } catch (error) {
+    } catch {
         return false
     }
     try {
@@ -355,10 +355,11 @@ async function executeCreate(
             accessToken,
         );
     }
-    const pageId =
+    const rawPageId =
         typeof parsedBody === "object" && parsedBody !== null && "id" in parsedBody
-            ? String((parsedBody as Record<string, unknown>).id)
+            ? (parsedBody as Record<string, unknown>).id
             : undefined;
+    const pageId = typeof rawPageId === "string" && rawPageId ? rawPageId : undefined;
     return {
         success: true,
         operation: "create",
@@ -403,7 +404,13 @@ async function executeGetMany(
         runMetadata,
         "get_many",
     );
-    const pageSize = Math.min(100, Math.max(1, data.pageSize ?? 25));
+    const pageSize = Math.min(
+        100,
+        Math.max(
+            1,
+            Number.isFinite(data.pageSize) ? Math.floor(data.pageSize as number) : 25,
+        ),
+    );
     const startCursor = parseOptionalTemplate(data.startCursor, runMetadata);
     const body: Record<string, unknown> = {
         page_size: pageSize,
@@ -433,7 +440,7 @@ async function executeGetMany(
 
     try {
         parsedBody=await callNotion(dataSourceEndpoint,{
-            method:"GET",
+            method:"POST",
             headers:getNotionHeaders(accessToken),
             body:JSON.stringify(body)
         },"get_many")

@@ -41,7 +41,11 @@ function parseResponseBody(bodyText: string): NodeExecutionOutput{
     }
 }
 
-function parseRequiredString(value:string|undefined,fieldname:string,runMetadata:NodeExecutionOutput):string{
+function parseRequiredString(
+    value: string | undefined,
+    fieldname: string,
+    runMetadata: Record<string, NodeExecutionOutput>,
+): string {
     const parsed=parseTemplate(value??"",runMetadata as Record<string,string>).trim()
     if (!parsed){
         throw new Error(`github ${fieldname} is required`)
@@ -130,7 +134,7 @@ function getGitHubHeaders(
 
 async function executeCreateIssue(
  data:GitHubNodeData,
- runMetadata:NodeExecutionOutput,
+ runMetadata:Record<string, NodeExecutionOutput>,
  accessToken:string
 ):Promise<NodeExecutionOutput>{
     const owner=parseRequiredString(data.owner,"owner",runMetadata)
@@ -188,7 +192,7 @@ async function executeCreateComment(
     const parsedBody=await callGitHub(endpoint,{
         method:"POST",
         headers:getGitHubHeaders(accessToken,true),
-        body:JSON.stringify(body)
+        body:JSON.stringify({body})
     },"create_comment")
 
     return {

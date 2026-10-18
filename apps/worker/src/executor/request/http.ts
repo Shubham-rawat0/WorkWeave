@@ -10,7 +10,7 @@ function isLikelyTextResponse(contentType:string|null):boolean{
     }
 
     const content=contentType.toLowerCase().split(";")[0]?.trim()??""
-    if (content.startsWith("/text")){
+    if (content.startsWith("text/")){
         return true
     }
     return (
@@ -103,13 +103,19 @@ export async function executeHTTPNode(
     let headersObj:Record<string,string>={}
     if (Array.isArray(headers)){
         headers.forEach((h)=>{
-            if (h.key && h.value){
-                headersObj[h.key]=parseTemplate(h.value,runMetadata as Record<string,string>)
+            const key=h.key?.trim()
+            if (key && h.value){
+                headersObj[parseTemplate(key,runMetadata as Record<string,string>)]=parseTemplate(h.value,runMetadata as Record<string,string>)
             }
         })
     }
     else if(headers){
-        headersObj=headers
+        for (const [key,value] of Object.entries(headers)){
+            const parsedKey=key.trim()
+            if (parsedKey && value){
+                headersObj[parseTemplate(parsedKey,runMetadata as Record<string,string>)]=parseTemplate(value,runMetadata as Record<string,string>)
+            }
+        }
     }
 
     let parsedBody
@@ -124,7 +130,8 @@ export async function executeHTTPNode(
         headers:headersObj
     }
     const controller=new AbortController()
-    const timeoutId=timeout?setTimeout(()=>controller.abort(),timeout):null
+    const timeoutMs=typeof timeout==="number"&&Number.isFinite(timeout)&&timeout>0?timeout:null
+    const timeoutId=timeoutMs!==null?setTimeout(()=>controller.abort(),timeoutMs):null
 
     requestOptions.signal=controller.signal
     if (resolvedMethod !== "GET" && parsedBody !== undefined) {
