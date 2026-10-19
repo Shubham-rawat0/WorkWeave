@@ -1,7 +1,6 @@
 import { parseTemplate, parseTemplateWithMetadata } from "@WorkOrchestrator/shared/parser";
 import { AINodeData, NodeExecutionOutput } from "../../engine/types";
 import { resolveCredentials } from "../../engine/credentials";
-import { platform } from "node:os";
 
 type SupportedAINodeType =
     | "aiNode"
@@ -39,7 +38,8 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 
-function ensureOpenAiJSONinput(payload:unknown,label:string):Record<string,unknown>{
+// Validates a raw OpenAI chat-completions payload (messages array with valid roles/content).
+function ensureOpenAiJsonInput(payload: unknown, label: string): Record<string, unknown> {
     if (!isRecord(payload)){
         throw new Error(`${label} JSON input must be an object with a "messages" array.`)
     }
@@ -77,6 +77,7 @@ function ensureOpenAiJSONinput(payload:unknown,label:string):Record<string,unkno
     return payload;
 }
 
+// Validates a raw Anthropic messages payload (user/assistant roles only).
 function ensureAnthropicJsonInput(
     payload: unknown,
     providerLabel: string,
@@ -119,6 +120,7 @@ function ensureAnthropicJsonInput(
     return payload;
 }
 
+// Validates a raw Gemini generateContent payload (contents with text parts).
 function ensureGeminiJsonInput(
     payload: unknown,
     providerLabel: string,
@@ -163,6 +165,7 @@ function ensureGeminiJsonInput(
     return payload
 }
 
+// Renders the JSON template, parses it, and validates it for the given provider.
 function parseProviderJsonInput(params: {
     provider: AIProvider;
     providerLabel: string;
@@ -190,7 +193,7 @@ function parseProviderJsonInput(params: {
         );
     }
     if (params.provider==="openai"){
-        return ensureOpenAiJSONinput(parsed,"openai")
+        return ensureOpenAiJsonInput(parsed,"openai")
     } 
     if (params.provider === "anthropic") {
         return ensureAnthropicJsonInput(parsed, params.providerLabel);
@@ -198,6 +201,7 @@ function parseProviderJsonInput(params: {
     return ensureGeminiJsonInput(parsed, params.providerLabel);
 }
 
+// Maps a node type string to its AI provider, throwing on unknown types.
 function resolveProvider(nodeType: string): AIProvider {
     if (nodeType in AI_PROVIDER_BY_NODE_TYPE) {
         return AI_PROVIDER_BY_NODE_TYPE[nodeType as SupportedAINodeType];
@@ -227,11 +231,13 @@ function getProviderApiKeyFromEnv(provider: AIProvider): string | undefined {
     }
 }
 
+// Wraps an unknown usage blob as NodeExecutionOutput, or undefined if absent.
 function normalizeUsage(usage: unknown): NodeExecutionOutput | undefined {
     if (usage === undefined || usage === null) return undefined;
     return usage as NodeExecutionOutput;
 }
 
+// Caps the prompt at MAX_PROMPT_CHARS, appending a truncation notice if cut.
 function truncatePrompt(prompt: string): {
     prompt: string;
     truncated: boolean;
@@ -256,6 +262,7 @@ function truncatePrompt(prompt: string): {
     };
 }
 
+// Sends a prompt-mode chat completion request to the OpenAI API.
 async function executeOpenAIRequest(params: {
     apiKey: string;
     model: string;
@@ -299,6 +306,7 @@ async function executeOpenAIRequest(params: {
     };
 }
 
+// Sends a prompt-mode messages request to the Anthropic API.
 async function executeAnthropicRequest(params: {
     apiKey: string;
     model: string;
@@ -352,6 +360,7 @@ async function executeAnthropicRequest(params: {
     };
 }
 
+// Sends a prompt-mode generateContent request to the Gemini API.
 async function executeGeminiRequest(params: {
     apiKey: string;
     model: string;
@@ -414,6 +423,7 @@ async function executeGeminiRequest(params: {
     };
 }
 
+// Sends a user-supplied JSON body to the OpenAI chat completions API.
 async function executeOpenAIJsonRequest(params: {
     apiKey: string;
     model: string;
@@ -431,8 +441,9 @@ async function executeOpenAIJsonRequest(params: {
     const bodyHasTemperature=typeof body.temperature==="number"
     const bodyHasMaxTokens = typeof body.max_tokens === "number";
 
+    // Reasoning models reject "temperature"; strip it from the merged body.
     if (bodyHasTemperature && isReasoningModel){
-        delete params.temperature
+        delete body.temperature
     }
 
     if (
@@ -468,6 +479,7 @@ async function executeOpenAIJsonRequest(params: {
     };
 }
 
+// Sends a user-supplied JSON body to the Anthropic messages API.
 async function executeAnthropicJsonRequest(params: {
     apiKey: string;
     model: string;
@@ -531,6 +543,7 @@ async function executeAnthropicJsonRequest(params: {
     };
 }
 
+// Sends a user-supplied JSON body to the Gemini generateContent API.
 async function executeGeminiJsonRequest(params: {
     apiKey: string;
     model: string;
@@ -605,6 +618,8 @@ async function executeGeminiJsonRequest(params: {
     };
 }
 
+// Entry point: resolves provider/credentials, renders templates, and dispatches
+// the request (prompt or JSON mode) to the matching provider API.
 export async function executeAINode(
     nodeType: string,
     data: AINodeData,
@@ -614,7 +629,6 @@ export async function executeAINode(
 ): Promise<NodeExecutionOutput> {
     const provider=resolveProvider(nodeType)
     const providerLabel=getProviderLabel(provider)
-    const templateMetadata=runMetadata
     const {
         prompt,
         model,
