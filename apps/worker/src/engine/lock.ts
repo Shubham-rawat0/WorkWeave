@@ -128,7 +128,7 @@ export async function acquireLock(workerId:string,workflowRunId:string):Promise<
 export async function renewLock(workerId: string, workflowRunId: string,ttlSeconds:number=LOCK_TTL_SECONDS): Promise<boolean> {
     const clampedTtl = Math.max(1, Math.floor(ttlSeconds));
     return withRedisFallback(
-        "worker-loack:renew",
+        "worker-lock:renew",
         async()=>{
             return mutateLockIfOwned(workflowRunId,workerId,(transaction)=>{
                 transaction.expire(lockKey(workflowRunId),clampedTtl) //sets key expiration to now+ttl
