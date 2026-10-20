@@ -3,13 +3,16 @@ import { NodeExecutionOutput, NodeRun, WorkflowNode } from "./types";
 import { executeAINode, executeConditionNode, executeCronTrigger, executeDelayNode, executeFilterNode, executeGitHubNode, executeHTTPNode, executeLogNode, executeNotionNode, executeSlackNode, executeTransformNode, executeWebhookTriggerNode } from "../executor";
 import { NodeStatus, prisma } from "@WorkOrchestrator/prisma";
 
+// Max bytes of a node output sent over SSE before it is truncated.
 const SSE_OUTPUT_MAX_BYTES = 8192;
+// Node types that count as AI nodes for run metadata aliasing.
 const AI_NODE_TYPES = new Set([
     "aiNode",
     "openaiNode",
     "anthropicNode",
     "geminiNode",
 ]);
+// Node types whose `success=false` output should fail the run.
 const SOFT_FAILURE_NODE_TYPES = new Set([
     "aiNode",
     "openaiNode",
@@ -21,6 +24,7 @@ const SOFT_FAILURE_NODE_TYPES = new Set([
 
 const redis=getMainRedisClient()
 
+// Maps an AI node type to its provider alias for run metadata.
 function getAIProviderAlias(
     nodeType: string,
 ): "openai" | "anthropic" | "gemini" | null {
@@ -30,6 +34,7 @@ function getAIProviderAlias(
     return null;
 }
 
+// Reads the optional trimmed `responseName` alias from a node's data.
 function getResponseName(node?: WorkflowNode): string | null {
     if (!node || !node.data ||typeof node.data!=="object"){
         return null
@@ -42,6 +47,7 @@ function getResponseName(node?: WorkflowNode): string | null {
     return trimmed.length>0?trimmed:null
 }
 
+// Extracts the usable output of a finished run, unwrapping bypassed passthroughs.
 function getRunMetadataOutput(run: NodeRun): NodeExecutionOutput | undefined {
     if (run.status==="Success"){
         return run.output === null || run.output === undefined
@@ -86,6 +92,7 @@ function truncateForSSE(
     }
 }
 
+// Returns an error message when a soft-failure node reported success=false.
 function getSoftFailureError(
     nodeType: string,
     output: NodeExecutionOutput,
@@ -122,6 +129,7 @@ function getSoftFailureError(
     return `${nodeType} execution returned success=false`;
 }
 
+// Publishes a node status event to the run's Redis pub/sub channel.
 function publishNodeStatus(
     workflowRunId: string,
     nodeId: string,
@@ -140,6 +148,7 @@ function publishNodeStatus(
         .catch(() => { });
 }
 
+// Finds the existing run record for a node, if any.
 function findNodeRunForNode(
     existingNodeRuns: NodeRun[],
     nodeId: string,
@@ -147,6 +156,7 @@ function findNodeRunForNode(
     return existingNodeRuns.find((node)=>node.nodeId===nodeId)
 }
 
+// Dispatches a node to its type-specific executor.
 async function executNodeLogic(
     node: WorkflowNode,
     nodeRunId: string,
@@ -212,6 +222,7 @@ async function executNodeLogic(
     }
 }
 
+// Executes a single workflow node and records its status/output in the DB.
 export async function executeNode(
     workflowRunId: string,
     node: WorkflowNode,
@@ -221,13 +232,16 @@ export async function executeNode(
 ): Promise<void> {
     let nodeRun = findNodeRunForNode(existingNodeRuns, node.id);
     if (nodeRun) {
+        // Already succeeded: nothing to do.
         if (nodeRun.status === NodeStatus.Success) {
             return;
         }
+        // Exhausted retries: fail permanently.
         if (nodeRun.status === NodeStatus.Failed && nodeRun.retryCount >= 3) {
             throw new Error(`Node ${node.id} failed permanently after 3 retries`);
         }
 
+        // Retry: bump retry count and mark running again.
         nodeRun = await prisma.nodeRun.update({
             where: {
                 id: nodeRun.id
@@ -243,6 +257,7 @@ export async function executeNode(
             nodeType: node.type})
     }
     else {
+        // First run for this node: create the run record.
         nodeRun = (await prisma.nodeRun.create({
             data: {
                 workflowRunId,
@@ -259,6 +274,7 @@ export async function executeNode(
     }
 
     try {
+        // Build lookup metadata from previously completed runs.
         const runMetadata: Record<string, NodeExecutionOutput> = {};
         const aiOutputs: NodeExecutionOutput[] = [];
         const providerOutputs: Partial<Record<"openai" | "anthropic" | "gemini", NodeExecutionOutput[]>> = {};
@@ -268,12 +284,14 @@ export async function executeNode(
             if (metadataValue!==undefined){
                 runMetadata[run.nodeId]=metadataValue
                 const sourceNode=nodeById?.get(run.nodeId)
+                // Also expose output under its responseName alias.
                 const responseName=getResponseName(sourceNode)
                 if (responseName && !(responseName in runMetadata)) {
                     runMetadata[responseName] = metadataValue;
                 }
 
                 if (sourceNode && AI_NODE_TYPES.has(sourceNode.type)) {
+                    // Track AI outputs so they can be aliased below.
                     aiOutputs.push(metadataValue);
                     const providerAlias = getAIProviderAlias(sourceNode.type);
                     if (providerAlias) {
@@ -285,6 +303,7 @@ export async function executeNode(
                 }
             }
         }
+        // Expose a single AI output as `ai` for convenience.
         if (aiOutputs.length === 1 && !("ai" in runMetadata)) {
             const aiOutput = aiOutputs[0];
             if (aiOutput !== undefined) {
@@ -292,6 +311,7 @@ export async function executeNode(
             }
         }
 
+        // Expose single outputs under each provider alias.
         for (const providerAlias of ["openai", "anthropic", "gemini"] as const) {
             const outputs = providerOutputs[providerAlias] ?? [];
             if (outputs.length === 1 && !(providerAlias in runMetadata)) {
@@ -302,6 +322,7 @@ export async function executeNode(
             }
         }
 
+        // Run the node and turn any soft failure into a real error.
         const output=await executNodeLogic(node,nodeRun.id,runMetadata,ownerUserId)
 
         const softFailureError = getSoftFailureError(node.type, output);
@@ -309,6 +330,7 @@ export async function executeNode(
             throw new Error(softFailureError);
         }
 
+        // Persist success, storing output only when there is one.
         if (output !== null) {
             await prisma.nodeRun.update({
                 where: { id: nodeRun.id },
@@ -332,6 +354,7 @@ export async function executeNode(
             output: truncateForSSE(output),
         });
     } catch (error) {
+        // Record the failure and rethrow so the caller can handle it.
         await prisma.nodeRun.update({
             where: { id: nodeRun.id },
             data: {
