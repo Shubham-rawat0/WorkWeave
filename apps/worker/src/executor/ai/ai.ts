@@ -623,7 +623,6 @@ async function executeGeminiJsonRequest(params: {
 export async function executeAINode(
     nodeType: string,
     data: AINodeData,
-    _nodeRunId: string,
     runMetadata: Record<string, NodeExecutionOutput>,
     ownerUserId: string,
 ): Promise<NodeExecutionOutput> {
