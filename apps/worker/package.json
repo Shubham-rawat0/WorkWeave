@@ -3,6 +3,9 @@
    "version": "0.0.0",
    "type": "module",
    "private": true,
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
    "devDependencies": {
       "@types/bun": "latest"
    },
@@ -13,6 +16,7 @@
       "@WorkOrchestrator/prisma": "workspace:*",
       "@WorkOrchestrator/shared": "workspace:*",
       "bullmq": "^6.3.15",
+      "dotenv": "^18.0.6",
       "zod": "^4.6.7"
    }
 }

@@ -385,16 +385,21 @@ const app = new Hono<{ Variables: { user: User } }>()
                 create: { userId: userId, month, runCount: 0 },
                 update: {},
             });
+            const userLimits = await tx.user.findUnique({
+                where: { id: userId },
+                select: { maxConcurrent: true },
+            });
+            const maxConcurrent = userLimits?.maxConcurrent ?? 2;
             const pendingRuns = await tx.workflowRun.count({
                 where: {
                     status: "Pending",
                     workflow: { userId: userId },
                 },
             });
-            if (pendingRuns >=2){
+            if (pendingRuns >= maxConcurrent){
                 throw new HTTPException(
                     409,
-                    {message: `Concurrent workflow limit reached 2. Wait for current executions to finish or upgrade your plan.`,
+                    {message: `Concurrent workflow limit reached ${maxConcurrent}. Wait for current executions to finish or upgrade your plan.`,
                } );
             }
             await tx.usageRecord.update({

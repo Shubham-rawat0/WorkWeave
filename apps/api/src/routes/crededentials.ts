@@ -6,7 +6,7 @@ import { validationHook } from "../lib/validator";
 import { Prisma, prisma } from "@WorkOrchestrator/prisma";
 import { HTTPException } from "hono/http-exception";
 import { createRateLimiter } from "../middleware/rateLimit";
-import { encryptJson } from "@WorkOrchestrator/shared/crypto";
+import { decryptJson, encryptJson } from "@WorkOrchestrator/shared/crypto";
 
 function maskKeys(keys: Record<string,unknown>):Record<string,string>{
     const masked: Record<string, string> = {};
@@ -136,7 +136,7 @@ const app = new Hono<{Variables:{user:User}}>()
         id: credential.id,
         title: credential.title,
         platform: credential.platform,
-        keys: maskKeys(credential.keys as Record<string, unknown>),
+        keys: maskKeys(decryptJson<Record<string, unknown>>(credential.keys as string)),
         createdAt: credential.createdAt,
         updatedAt: credential.updatedAt,
     });

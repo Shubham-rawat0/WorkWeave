@@ -11,8 +11,8 @@
       "default": "./src/index.ts"
     },
     "./nodeRegistry": {
-      "types": "./src/registry/nodeRegistry.ts",
-      "default": "./src/registry/nodeRegistry.ts"
+      "types": "./src/nodes/nodeRegistry.ts",
+      "default": "./src/nodes/nodeRegistry.ts"
     },
     "./redis": {
       "types": "./src/runtime/redis.ts",

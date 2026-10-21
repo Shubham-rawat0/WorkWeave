@@ -5,7 +5,7 @@ import { getMainRedisClient } from "@WorkOrchestrator/shared/redis";
 import { acquireLock, LOCK_TTL_SECONDS, releaseLock, renewLock } from "./lock";
 import { getReachableNodes, hasCycle } from "./graphUtils";
 
-const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
+const WORKER_ID = `worker-${process.pid}`;
 
 type EdgeActivation="active"|"inactive"
 
@@ -46,7 +46,7 @@ function isNodeActive(node:WorkflowNode):boolean{
 }
 
 function getWorkflowRunSource(metadata: unknown): string | null {
-    if (!metadata && typeof metadata!=="object"){
+    if (!metadata || typeof metadata!=="object"){
         return null
     }
     const source=(metadata as {source?:unknown}).source
@@ -448,7 +448,13 @@ function selectTriggerEntryNodes(
     metadata: unknown,
     nodes: WorkflowNode[],
 ): TriggerSelectionResult {
-    const activeTriggerNodeIds=nodes.filter((node)=>isTriggerNode(node) && isNodeActive(node)).map((node)=>node.id)
+    const activeTriggerNodeIds=nodes.filter((node)=>{
+        if (!isTriggerNode(node) || !isNodeActive(node)) return false;
+        const data = node.data as Record<string, unknown>;
+        return (node.type === "webhookTrigger" || node.type === "cronTrigger")
+            ? data.isConfigured === true
+            : true;
+    }).map((node)=>node.id)
 
     if (!metadata || typeof metadata !== "object") {
         return {
@@ -511,6 +517,13 @@ function selectTriggerEntryNodes(
                 error: `${source} trigger node ${nodeId} is deactivated.`,
             };
         }
+        const triggerData = matching.data as Record<string, unknown>;
+        if (triggerData.isConfigured !== true) {
+            return {
+                startNodeIds: [],
+                error: `${source} trigger node ${nodeId} is not configured.`,
+            };
+        }
         return {
             startNodeIds: [nodeId],
             error: null,
@@ -529,7 +542,7 @@ function selectTriggerEntryNodes(
 }
 
 export async function executeWorkflow(workflowRunId: string): Promise<void> {
-    const lockAcquired=await acquireLock(workflowRunId,WORKER_ID)
+    const lockAcquired=await acquireLock(WORKER_ID,workflowRunId)
 
     if(!lockAcquired){
         console.log(`[${WORKER_ID}] could not acquire lock for ${workflowRunId}`)
@@ -542,7 +555,7 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
     );
 
     const lockHeartbeat=setInterval(()=>{
-        renewLock(workflowRunId,WORKER_ID).catch((error)=>{
+        renewLock(WORKER_ID,workflowRunId).catch((error)=>{
             console.error(
                 `[${WORKER_ID}] Failed to renew lock for ${workflowRunId}:`,
                 error,
@@ -885,7 +898,7 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
         throw error;
     } finally{
         clearInterval(lockHeartbeat);
-        const released = await releaseLock(workflowRunId, WORKER_ID);
+        const released = await releaseLock(WORKER_ID, workflowRunId);
         if (!released) {
             console.warn(
                 `[${WORKER_ID}] Lock for ${workflowRunId} was not owned at release time`,

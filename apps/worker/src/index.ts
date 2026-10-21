@@ -22,7 +22,11 @@ function validateRequiredEnv(): void {
     }
 }
 
-const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
+const WORKER_ID = `worker-${process.pid}`;
+const STARTUP_TIMEOUT_MS = 30_000;
+
+let shuttingDown = false;
+let stopCronScheduler: (() => void) | undefined;
 
 async function bootstrap():Promise<void>{
     loadWorkerEnv()
@@ -42,7 +46,46 @@ async function bootstrap():Promise<void>{
         process.exit(1);
     });
 
-    await worker.waitUntilReady();
+    const shutdown = async (signal: NodeJS.Signals) => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        console.log(`[${WORKER_ID}] Received ${signal}, shutting down worker...`);
+        stopCronScheduler?.();
+        const forceExit = setTimeout(() => {
+            console.error(`[${WORKER_ID}] Shutdown timed out; forcing exit`);
+            process.exit(1);
+        }, 10_000);
+        forceExit.unref();
+        try {
+            await worker.close();
+            console.log(`[${WORKER_ID}] Worker gracefully stopped`);
+            process.exit(0);
+        } catch (error) {
+            console.error(`[${WORKER_ID}] Error while closing worker:`, error);
+            process.exit(1);
+        } finally {
+            clearTimeout(forceExit);
+        }
+    };
+
+    process.on("SIGINT", () => { void shutdown("SIGINT"); });
+    process.on("SIGTERM", () => { void shutdown("SIGTERM"); });
+
+    let startupTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        await Promise.race([
+            worker.waitUntilReady(),
+            new Promise<never>((_, reject) => {
+                startupTimer = setTimeout(
+                    () => reject(new Error(`Redis readiness timed out after ${STARTUP_TIMEOUT_MS}ms`)),
+                    STARTUP_TIMEOUT_MS,
+                );
+            }),
+        ]);
+    } finally {
+        if (startupTimer) clearTimeout(startupTimer);
+    }
+    if (shuttingDown) return;
     void worker.run().catch((error) => {
         console.error(
             `[${WORKER_ID}] Worker run loop stopped unexpectedly:`,
@@ -51,29 +94,10 @@ async function bootstrap():Promise<void>{
         process.exit(1);
     });
 
-    startCronScheduler();
+    stopCronScheduler = startCronScheduler();
     console.log(
         `[${WORKER_ID}] Worker started and ready to process workflow runs`,
     );
-    
-    const shutdown = async (signal: NodeJS.Signals) => {
-        console.log(`[${WORKER_ID}] Received ${signal}, shutting down worker...`);
-        try {
-            await worker.close();
-            console.log(`[${WORKER_ID}] Worker gracefully stopped`);
-        } catch (error) {
-            console.error(`[${WORKER_ID}] Error while closing worker:`, error);
-        } finally {
-            process.exit(0);
-        }
-    };
-
-    process.on("SIGINT", () => {
-        void shutdown("SIGINT");
-    });
-    process.on("SIGTERM", () => {
-        void shutdown("SIGTERM");
-    });
 }
 
 void bootstrap().catch((error) => {

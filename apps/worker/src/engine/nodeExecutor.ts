@@ -78,10 +78,11 @@ function truncateForSSE(
     if (output === null || output === undefined) return null;
     try {
         const json = JSON.stringify(output);
-        if (json.length <= SSE_OUTPUT_MAX_BYTES) return output;
+        const jsonBytes = Buffer.byteLength(json, "utf8");
+        if (jsonBytes <= SSE_OUTPUT_MAX_BYTES) return output;
         return {
             _truncated: true,
-            _previewLength: json.length,
+            _previewLength: jsonBytes,
             _preview:
                 typeof output === "string"
                     ? output.slice(0, 500) + "..."

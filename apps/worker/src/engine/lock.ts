@@ -2,7 +2,6 @@ import { prisma } from "@WorkOrchestrator/prisma";
 import { getMainRedisClient, withRedisFallback } from "@WorkOrchestrator/shared/redis";
 
 export const LOCK_TTL_SECONDS = 5 * 60;
-const LOCK_COMPARE_ATTEMPTS = 3;
 
 const redis=getMainRedisClient()
 
@@ -79,35 +78,34 @@ async function isDbLocked(
 async function mutateLockIfOwned(
     workflowRunId: string,
     workerId: string,
-    mutate:(transaction:ReturnType<typeof redis.multi>)=>void):Promise<boolean>{
-        const key=lockKey(workflowRunId)
-    for (let attempt = 0; attempt < LOCK_COMPARE_ATTEMPTS; attempt += 1) {
-        try {
-            const currentOwner = await redis.get(key);
-            if (currentOwner !== workerId) {
-                return false;
-            }
-            const transaction = redis.multi();
-            mutate(transaction);
-            const result = await transaction.exec();
-            if (result === null) {
-                continue;
-            }
-            const [, affectedRows] = result[0] ?? [null, 0];
-            return Number(affectedRows) > 0;
-        } finally {
-            await redis.unwatch().catch(() => { });
-        }
-    }
-    return false;
+    operation: "release" | "renew",
+    ttlSeconds = LOCK_TTL_SECONDS,
+): Promise<boolean> {
+    const script = operation === "release"
+        ? `if redis.call("get", KEYS[1]) == ARGV[1] then
+                return redis.call("del", KEYS[1])
+            else
+                return 0
+            end`
+        : `if redis.call("get", KEYS[1]) == ARGV[1] then
+                return redis.call("expire", KEYS[1], ARGV[2])
+            else
+                return 0
+            end`;
+    const result = await redis.eval(
+        script,
+        1,
+        lockKey(workflowRunId),
+        workerId,
+        String(Math.max(1, Math.floor(ttlSeconds))),
+    );
+    return Number(result) === 1;
 }
 
 export async function releaseLock(workerId:string,workflowRunId:string):Promise<boolean>{
     return withRedisFallback("worker-lock:release",
         async()=>{
-             return mutateLockIfOwned(workflowRunId,workerId,(transaction)=>{
-                transaction.del(lockKey(workflowRunId))
-            })
+             return mutateLockIfOwned(workflowRunId, workerId, "release")
         },
         async ()=> releaseDbLock(workflowRunId,workerId)
     )
@@ -130,9 +128,7 @@ export async function renewLock(workerId: string, workflowRunId: string,ttlSecon
     return withRedisFallback(
         "worker-lock:renew",
         async()=>{
-            return mutateLockIfOwned(workflowRunId,workerId,(transaction)=>{
-                transaction.expire(lockKey(workflowRunId),clampedTtl) //sets key expiration to now+ttl
-            })
+            return mutateLockIfOwned(workflowRunId, workerId, "renew", clampedTtl)
         },
         async()=>{
             return renewDBLock(workflowRunId,workerId)

@@ -75,8 +75,10 @@ export const app = new Hono()
             500
         );
     })
+    .use("/api/v1/workflow", authMiddleware)
     .use("/api/v1/workflow/*", authMiddleware)
-    .use("/api/v1/cred/*", authMiddleware)
+    .use("/api/v1/credentials", authMiddleware)
+    .use("/api/v1/credentials/*", authMiddleware)
     .route("/api/v1", apiV1);
 
 export type AppType = typeof app;

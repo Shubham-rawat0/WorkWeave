@@ -4,7 +4,6 @@ import { getMainRedisClient, withRedisFallback } from "@WorkOrchestrator/shared/
 import { RunReservationLockTimeoutError, withUserRunReservationLock } from "@WorkOrchestrator/shared/runLock";
 import { getWorkflowQueue } from "@WorkOrchestrator/shared/queue";
 
-const POLL_INTERVAL_MS = 60000;
 
 const DB_HEALTHCHECK_TIMEOUT_MS = (() => {
     const parsed = Number.parseInt(
@@ -57,10 +56,6 @@ class RunLimitError extends Error {
     constructor(public readonly code: LimitErrorCode,message: string,) {
         super(message);
     }
-}
-
-function getPlanLimits():number{
-    return  2 
 }
 
 function getMonthKey(now: Date): string {
@@ -243,13 +238,14 @@ async function reserveCronRun(params: {
     userId: string;
     nodeId: string;
     bucket: string;
+    maxConcurrent: number;
 }): Promise<{
     runId: string;
     month: string;
 }> {
     const now= new Date()
     const month=getMonthKey(now)
-    const maxConcurrent  = getPlanLimits()
+    const maxConcurrent = params.maxConcurrent;
 
     const run=await prisma.$transaction(async(tx)=>{
         await tx.usageRecord.upsert({
@@ -332,9 +328,11 @@ async function tick():Promise<void>{
         select:{
             id:true,
             userId: true,
-            nodes: true
+            nodes: true,
+            user: { select: { maxConcurrent: true } },
         }
     }))
+    const activeScheduleKeys = new Set<string>();
     for (const workflow of workflows){
         let nodes: WorkflowNode[] = [];
         try {
@@ -354,6 +352,7 @@ async function tick():Promise<void>{
         }
 
         for (const node of cronNodes){
+            activeScheduleKeys.add(`${workflow.id}:${node.id}`);
             if (!workflow.userId) {
                 continue;
             }
@@ -396,7 +395,8 @@ async function tick():Promise<void>{
                         workflowId:workflow.id,
                         userId,
                         nodeId:node.id,
-                        bucket
+                        bucket,
+                        maxConcurrent: workflow.user?.maxConcurrent ?? 2,
                     })
                 )
                 try {
@@ -427,16 +427,34 @@ async function tick():Promise<void>{
             }
         }
     }
+    for (const key of lastScheduledBucket.keys()) {
+        if (!activeScheduleKeys.has(key)) lastScheduledBucket.delete(key);
+    }
 }
 
-export function startCronScheduler():void{
-    tick().catch((error) => {
-        console.error("[cron-scheduler] Initial tick failed:", error);
-    });
-    
-    setInterval(() => {
-        tick().catch((error) => {
+export function startCronScheduler(): () => void {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleNextTick = () => {
+        if (stopped) return;
+        const now = Date.now();
+        const delay = 60_000 - (now % 60_000);
+        timer = setTimeout(() => {
+            void runTick();
+        }, delay);
+    };
+    const runTick = async () => {
+        if (stopped) return;
+        try {
+            await tick();
+        } catch (error) {
             console.error("[cron-scheduler] Tick failed:", error);
-        });
-    }, POLL_INTERVAL_MS);
+        }
+        scheduleNextTick();
+    };
+    void runTick();
+    return () => {
+        stopped = true;
+        if (timer) clearTimeout(timer);
+    };
 }

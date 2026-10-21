@@ -3,10 +3,12 @@ import { resolve } from "node:path";
 import http from "node:http";
 import { WebSocketServer } from "ws";
 import { Duplex } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { ExecutionStreamTokenPayload, verifyExecutionStreamToken } from "@WorkOrchestrator/shared/executionSignature";
 import { CreateRedisSubscriber } from "@WorkOrchestrator/shared/redis";
 
-config({ path: resolve(process.cwd(), "../../.env") })
+const currentDirectory = resolve(fileURLToPath(new URL(".", import.meta.url)));
+config({ path: resolve(currentDirectory, "../../../.env"), override: false });
 
 const host = process.env.REALTIME_HOST?.trim() || "::";
 const port = Number.parseInt(

@@ -152,7 +152,7 @@ const filterNodeDataSchema = z
         responseName: z.string().optional(),
     })
     .loose();
-const workflowNodeSchema = z.discriminatedUnion("type", [
+const knownWorkflowNodeSchema = z.discriminatedUnion("type", [
     z
         .object({
             id: z.string(),
@@ -298,6 +298,27 @@ const workflowNodeSchema = z.discriminatedUnion("type", [
         })
         .loose(),
 ]);
+
+const knownWorkflowNodeTypes = new Set([
+    "slackNode", "telegram", "httpTrigger", "githubNode", "notionNode",
+    "aiNode", "openaiNode", "geminiNode", "anthropicNode", "triggerNode",
+    "manualTrigger", "webhookTrigger", "cronTrigger", "conditionNode",
+    "delayNode", "logNode", "transformNode", "filterNode",
+]);
+// Keep old or newly introduced node types parseable. The executor can then
+// report an unsupported reachable node as a node failure instead of rejecting
+// the entire workflow's node array before execution begins.
+const workflowNodeSchema = z.object({
+        id: z.string(),
+        type: z.string(),
+        data: z.unknown().optional(),
+    }).loose().superRefine((node, context) => {
+        if (!knownWorkflowNodeTypes.has(node.type)) return;
+        const parsed = knownWorkflowNodeSchema.safeParse(node);
+        if (!parsed.success) {
+            context.addIssue({ code: "custom", message: parsed.error.message });
+        }
+    });
 const workflowEdgeSchema = z
     .object({
         id: z.string(),
