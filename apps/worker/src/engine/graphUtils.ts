@@ -102,19 +102,23 @@ export function getReachableNodes(
     startNodeIds?: string[],
 ): WorkflowNode[] {
     const graph = buildAdjacency(nodes, edges);
+
     const triggerTypes = [
         "triggerNode",
         "manualTrigger",
         "webhookTrigger",
         "cronTrigger",
     ];
+
     const triggerNodes =
         startNodeIds && startNodeIds.length > 0
             ? nodes.filter((n) => startNodeIds.includes(n.id))
             : nodes.filter((n) => triggerTypes.includes(n.type));
+
     if (triggerNodes.length === 0) return nodes;
     const visited = new Set<string>();
     const queue: string[] = [];
+
     for (const trigger of triggerNodes) {
         const hasOutgoing = edges.some((e) => e.source === trigger.id);
         if (hasOutgoing) {
@@ -122,12 +126,14 @@ export function getReachableNodes(
             queue.push(trigger.id);
         }
     }
+
     if (queue.length === 0) {
         if (startNodeIds && startNodeIds.length > 0) {
             return triggerNodes;
         }
         return nodes;
     }
+    
     while (queue.length > 0) {
         const current = queue.shift()!;
         for (const neighbor of graph.get(current) || []) {
@@ -139,6 +145,7 @@ export function getReachableNodes(
     }
     return nodes.filter((n) => visited.has(n.id));
 }
+
 export function getReadyNodes(
     nodes: WorkflowNode[],
     edges: WorkflowEdge[],
