@@ -16,13 +16,24 @@ const client = hc<AppType>(API_URL, {
 });
 
 export type User = InferResponseType<typeof client.api.v1.auth.me.$get>["user"];
+
 export type WorkflowSummary = InferResponseType<
     typeof client.api.v1.workflow.$get
 >[number];
+
 export type WorkflowStatus = Exclude<WorkflowSummary["lastRunStatus"], null>;
+export type WorkflowDetails = InferResponseType<
+    (typeof client.api.v1.workflow)[":id"]["$get"]
+>["workflow"];
+
+export type CredentialSummary = InferResponseType<
+    typeof client.api.v1.credentials.$get
+>["credentials"][number];
+
 export type SessionInfo = InferResponseType<
     typeof client.api.v1.auth.sessions.$get
 >["sessions"][number];
+
 type ResponseBody<Response> = Response extends ClientResponse<
     infer Body,
     infer Status,
@@ -103,4 +114,32 @@ export const api = {
         unwrap(client.api.v1.auth.sessions.$delete()),
     signout: () => unwrap(client.api.v1.auth.signout.$post()),
     workflows: () => unwrap(client.api.v1.workflow.$get()),
+    workflow: (id: string) =>
+        unwrap(
+            client.api.v1.workflow[":id"].$get({
+                param: { id },
+            }),
+        ),
+    createWorkflow: (
+        body: InferRequestType<
+            typeof client.api.v1.workflow.create.$post
+        >["json"],
+    ) => unwrap(client.api.v1.workflow.create.$post({ json: body })),
+    credentials: () => unwrap(client.api.v1.credentials.$get()),
+    createCredential: (
+        body: InferRequestType<
+            typeof client.api.v1.credentials.create.$post
+        >["json"],
+    ) => unwrap(client.api.v1.credentials.create.$post({ json: body })),
+    updateCredential: (
+        body: InferRequestType<
+            typeof client.api.v1.credentials.update.$post
+        >["json"],
+    ) => unwrap(client.api.v1.credentials.update.$post({ json: body })),
+    deleteCredential: (id: string) =>
+        unwrap(
+            client.api.v1.credentials.remove[":id"].$post({
+                param: { id },
+            }),
+        ),
 };
