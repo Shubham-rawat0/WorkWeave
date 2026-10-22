@@ -35,7 +35,6 @@ import type { User } from "@/lib/api"
 
 const NAV_ITEMS: { title: string; href: string; icon: LucideIcon }[] = [
   { title: "Dashboard", href: "/home", icon: LayoutDashboardIcon },
-  { title: "Workflows", href: "/home/workflows", icon: WorkflowIcon },
   { title: "Executions", href: "/home/executions", icon: ActivityIcon },
   { title: "Credentials", href: "/home/credentials", icon: KeySquareIcon },
   { title: "Account", href: "/home/account", icon: UserRoundIcon },
