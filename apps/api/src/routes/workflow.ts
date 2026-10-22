@@ -11,6 +11,7 @@ import { getRunSource, validateWorkflowGraph } from "../lib/workflow";
 import { getWorkflowQueue } from "@WorkOrchestrator/shared/queue";
 import { resolveExecutionStreamSigningSecret, resolveExecutionStreamWsBaseUrlFromEnv } from "../lib/ws";
 import { signExecutionStreamToken } from "@WorkOrchestrator/shared/executionSignature";
+import { getWebhookEndpointUrls, syncWebhookEndpoints } from "../lib/webhooks";
 
 function toJson(value: unknown): Prisma.InputJsonValue {
     if (value === null) {
@@ -122,7 +123,10 @@ const app = new Hono<{ Variables: { user: User } }>()
     if (!workflow){
         throw new HTTPException(404,{message:"workflow not found"})
     }
-    return c.json({ workflow });
+    return c.json({
+        workflow,
+        webhookEndpoints: await getWebhookEndpointUrls(workflow.id),
+    });
 })
 
 .delete("/:id", async (c) => {
@@ -166,40 +170,47 @@ const app = new Hono<{ Variables: { user: User } }>()
         throw new HTTPException(409,{message:`Workflow ${body.id} already exists`})
     }
 
-    const workflow = await prisma.workflow.create({
-        data: {
-            id: body.id,
-            title: body.title,
-            userId: userId,
-            nodes: toJson(body.nodes),
-            edges: toJson(body.edges),
-            trigger: {
-                create: {
-                    availableTriggerId: body.availableTriggerId,
-                    metadata: toJson(body.triggerMetadata),
+    const workflow = await prisma.$transaction(async (tx) => {
+        const created = await tx.workflow.create({
+            data: {
+                id: body.id,
+                title: body.title,
+                userId: userId,
+                nodes: toJson(body.nodes),
+                edges: toJson(body.edges),
+                trigger: {
+                    create: {
+                        availableTriggerId: body.availableTriggerId,
+                        metadata: toJson(body.triggerMetadata),
+                    },
+                },
+                actions: {
+                    create: body.actions.map((action, index) => ({
+                        id: action.id,
+                        availableActionId: action.availableActionId,
+                        sortingOrder: index,
+                        metadata: toJson(action.metadata),
+                    })),
                 },
             },
-            actions: {
-                create: body.actions.map((action, index) => ({
-                    id: action.id,
-                    availableActionId: action.availableActionId,
-                    sortingOrder: index,
-                    metadata: toJson(action.metadata),
-                })),
+            include: {
+                trigger: {
+                    include: { type: true },
+                },
+                actions: {
+                    include: { type: true },
+                    orderBy: { sortingOrder: "asc" },
+                },
             },
-        },
-        include: {
-            trigger: {
-                include: { type: true },
-            },
-            actions: {
-                include: { type: true },
-                orderBy: { sortingOrder: "asc" },
-            },
-        },
+        });
+        await syncWebhookEndpoints(tx, created.id, body.nodes);
+        return created;
     });
 
-    return c.json({workflow},201)
+    return c.json({
+        workflow,
+        webhookEndpoints: await getWebhookEndpointUrls(workflow.id),
+    },201)
 })
 
 .post("/update",zValidator("json",updateWorkflowInputSchema,validationHook),async(c)=>{
@@ -253,6 +264,12 @@ const app = new Hono<{ Variables: { user: User } }>()
             throw new HTTPException(404,{message:"Workflow not found"})
         }
 
+        await syncWebhookEndpoints(
+            tx,
+            input.id,
+            input.nodes ?? existing.nodes,
+        );
+
         if (input.triggerMetadata !== undefined) {
             await tx.trigger.updateMany({
                 where:{ workflowId: input.id },
@@ -289,7 +306,10 @@ const app = new Hono<{ Variables: { user: User } }>()
         })
     })
 
-    return c.json({workflow},200)
+    return c.json({
+        workflow,
+        webhookEndpoints: await getWebhookEndpointUrls(workflow.id),
+    },200)
 })
 
 .post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook),async(c)=>{
@@ -355,8 +375,7 @@ const app = new Hono<{ Variables: { user: User } }>()
     if (nodeData?.isConfigured !== true) {
         throw new HTTPException(400, { message: "Selected trigger node not configured yet" })
     }
-}
-    else {
+    }else {
         const hasActiveManualTrigger = workflowNodes.some((node) => {
             const nodeType = typeof node?.type === "string" ? node.type : null;
             if (nodeType !== "manualTrigger" && nodeType !== "triggerNode") {
