@@ -37,11 +37,18 @@ export default function WorkflowPage() {
   }, [id]);
 
   return (
-    <div className="min-h-full">
+    <div
+      className="relative min-h-full w-full bg-black bg-[radial-gradient(circle,#333333_1px,transparent_1px)] [background-size:20px_20px]"
+      style={{
+        backgroundColor: "#141414",
+        backgroundImage: "radial-gradient(circle, #333333 1px, transparent 1px)",
+        backgroundSize: "20px 20px",
+      }}
+    >
       {error && (
         <p
           role="alert"
-          className="mx-6 mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400"
+          className="relative z-10 mx-6 mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400"
         >
           {error}
         </p>
