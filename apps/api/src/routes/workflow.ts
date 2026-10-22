@@ -362,7 +362,15 @@ const app = new Hono<{ Variables: { user: User } }>()
         if (!triggerNode) {
             throw new HTTPException(400, { message: "Trigger does not belong to this workflow" })
         }
-        
+
+        const expectedNodeType =
+            input.triggerSource === "cron" ? "cronTrigger" : "webhookTrigger";
+        if (triggerNode.type !== expectedNodeType) {
+            throw new HTTPException(400, {
+                message: `${input.triggerSource} execution requires a ${expectedNodeType} node.`,
+            });
+        }
+
     const nodeData =
         triggerNode.data && typeof triggerNode.data === "object"
             ? (triggerNode.data as {
