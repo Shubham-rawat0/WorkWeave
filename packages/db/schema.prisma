@@ -62,6 +62,7 @@ model Workflow {
   trigger      Trigger?
   actions      Action[]
   runs         WorkflowRun[]
+  webhookEndpoints WebhookEndpoint[]
   nodes        Json          @default("[]")
   edges        Json          @default("[]")
   createdAt    DateTime      @default(now())
@@ -84,6 +85,21 @@ model AvailableTrigger {
   name     String
   image    String
   triggers Trigger[]
+}
+
+model WebhookEndpoint {
+  id            String   @id @default(uuid())
+  workflowId    String
+  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  nodeId        String
+  tokenHash     String   @unique
+  tokenEncrypted String
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([workflowId, nodeId])
+  @@index([workflowId])
 }
 
 model Action {
