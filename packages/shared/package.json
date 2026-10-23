@@ -41,6 +41,10 @@
     "./parser": {
       "types": "./src/parser/parser.ts",
       "default": "./src/parser/parser.ts"
+    },
+    "./core": {
+      "types": "./src/core/validation.ts",
+      "default": "./src/core/validation.ts"
     }
   },
   "dependencies": {
