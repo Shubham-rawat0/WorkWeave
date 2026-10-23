@@ -261,14 +261,7 @@ export default function HomePage() {
         availableTriggerId: "manual",
         triggerMetadata: {},
         actions: [],
-        nodes: [
-          {
-            id: "manual-trigger",
-            type: "manualTrigger",
-            position: { x: 100, y: 100 },
-            data: { label: "Manual Trigger", isConfigured: true },
-          },
-        ],
+        nodes: [],
         edges: [],
       });
       router.push(`/home/${workflow.id}`);

@@ -64,7 +64,7 @@ export function WorkflowNode({
       {ctx.canEditNodes && (
         <button
           type="button"
-          onClick={() => ctx.onDeleteNode(id)}
+          onClick={() => ctx.deleteNode(id)}
           aria-label={`Delete ${label}`}
           title="Delete node"
           className="absolute -right-1.5 -top-1.5 z-10 flex size-4 items-center justify-center rounded-md border border-[#3a3a38] bg-[#262626] text-[#8a8a87] opacity-0 transition-all duration-150 group-hover:opacity-100 hover:border-[#7a3a3a] hover:bg-[#3a2020] hover:text-[#e08a8a] focus-visible:opacity-100"

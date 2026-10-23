@@ -125,6 +125,16 @@ export const api = {
             typeof client.api.v1.workflow.create.$post
         >["json"],
     ) => unwrap(client.api.v1.workflow.create.$post({ json: body })),
+    updateWorkflow: (
+        body: InferRequestType<
+            typeof client.api.v1.workflow.update.$post
+        >["json"],
+    ) => unwrap(client.api.v1.workflow.update.$post({ json: body })),
+    executeWorkflow: (
+        body: InferRequestType<
+            typeof client.api.v1.workflow.execute.$post
+        >["json"],
+    ) => unwrap(client.api.v1.workflow.execute.$post({ json: body })),
     credentials: () => unwrap(client.api.v1.credentials.$get()),
     createCredential: (
         body: InferRequestType<

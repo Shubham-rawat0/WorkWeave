@@ -82,7 +82,7 @@ export function PlaygroundNodeConfigDialog({
   onOpenChange,
   onSave,
 }: PlaygroundNodeConfigDialogProps) {
-  const { onDeleteNode } = useEditor();
+  const { deleteNode } = useEditor();
   const [draft, setDraft] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -122,7 +122,7 @@ export function PlaygroundNodeConfigDialog({
   };
 
   const handleDelete = () => {
-    onDeleteNode(nodeId);
+    deleteNode(nodeId);
     onOpenChange(false);
   };
 

@@ -5,6 +5,8 @@ import {
   getSmoothStepPath,
   type EdgeProps,
 } from "@xyflow/react";
+import { Trash2 } from "lucide-react";
+import { useEdgeDelete } from "./edgeActionsContext";
 
 function WorkflowEdgeComponent({
   id,
@@ -13,7 +15,9 @@ function WorkflowEdgeComponent({
   targetX,
   targetY,
   data,
+  selected,
 }: EdgeProps) {
+  const onDelete = useEdgeDelete();
   const edgeLabel =
     typeof (
       data as
@@ -56,8 +60,8 @@ function WorkflowEdgeComponent({
           fill="none"
           className="react-flow__edge-path"
           style={{
-            stroke: "#555555",
-            strokeWidth: 2,
+            stroke: selected ? "#F04D26" : "#555555",
+            strokeWidth: selected ? 2.5 : 2,
             strokeDasharray: "6, 6",
             strokeLinecap: "round",
             strokeLinejoin: "round",
@@ -67,22 +71,35 @@ function WorkflowEdgeComponent({
           }}
         />
 
-        {edgeLabel ? (
-          <foreignObject
-            width={90}
-            height={24}
-            x={labelX - 45}
-            y={labelY - 12}
-            requiredExtensions="http://www.w3.org/1999/xhtml"
-            style={{ overflow: "visible" }}
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan absolute flex items-center gap-1"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              pointerEvents: "all",
+            }}
           >
-            <div className="flex items-center justify-center">
-              <span className="px-2 py-0.5 rounded-md border border-white/20 bg-black/60 text-[10px] uppercase tracking-wide text-white/70 animate-in fade-in-0 zoom-in-95 duration-200">
+            {edgeLabel ? (
+              <span className="rounded-md border border-white/20 bg-black/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/70">
                 {edgeLabel}
               </span>
-            </div>
-          </foreignObject>
-        ) : null}
+            ) : null}
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete(id);
+                }}
+                className="flex size-6 items-center justify-center rounded-md border border-[#5b5b5b] bg-[#1E1E1E] text-[#999] shadow-sm transition-colors hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-400"
+                title="Delete connection"
+                aria-label="Delete connection"
+              >
+                <Trash2 className="size-3" />
+              </button>
+            ) : null}
+          </div>
+        </EdgeLabelRenderer>
       </g>
     </>
   );
