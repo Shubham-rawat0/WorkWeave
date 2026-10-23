@@ -162,7 +162,7 @@ export default function WorkflowPage() {
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent
           side="right"
-          className="w-[360px] rounded-l-2xl border-white/10 bg-[#111111] text-white sm:max-w-[360px]"
+          className="w-[360px] rounded-tl-2xl border-white/10 bg-[#111111] text-white sm:max-w-[360px]"
         >
           <SheetHeader>
             <SheetTitle className="text-white">Add Node</SheetTitle>

@@ -1,35 +1,81 @@
 "use client";
-
-import { createContext, useContext, type ReactNode } from "react";
-
-export interface EditorContextValue {
-  onUpdateNodeData: (nodeId: string, data: Record<string, unknown>) => void;
-  onDeleteNode: (nodeId: string) => void;
-  getNodeData: (nodeId: string) => Record<string, unknown>;
+import React, { createContext, useContext } from "react";
+interface EditorContextType {
+  updateNodeData: (nodeId: string, data: any) => void | Promise<void>;
+  deleteNode: (nodeId: string) => void;
+  addNode: (
+    type: string,
+    position?: {
+      x: number;
+      y: number;
+    },
+  ) => void;
+  duplicateNode: (nodeId: string) => void;
+  getNodeData: (nodeId: string) => any;
   nodeStatuses: Record<string, string>;
-  onExecuteNode: (nodeId: string) => void;
-  onExecuteWorkflow: () => void;
-  onOpenNodeConfig: (nodeId: string, nodeType: string) => void;
+  executeNode?: (nodeId: string) => void;
+  executeWorkflow?: () => void;
+  openNodeConfig?: (nodeId: string, nodeType: string) => void;
   canEditNodes: boolean;
 }
 
-const EditorContext = createContext<EditorContextValue | null>(null);
-
-export function useEditor(): EditorContextValue {
-  const ctx = useContext(EditorContext);
-  if (!ctx) {
-    throw new Error("useEditor must be used within an <EditorProvider>");
-  }
-  return ctx;
+const EditorContext = createContext<EditorContextType | null>(null);
+interface EditorProviderProps {
+  children: React.ReactNode;
+  onUpdateNodeData?: (nodeId: string, data: any) => void | Promise<void>;
+  onDeleteNode?: (nodeId: string) => void;
+  onAddNode?: (
+    type: string,
+    position?: {
+      x: number;
+      y: number;
+    },
+  ) => void;
+  onDuplicateNode?: (nodeId: string) => void;
+  getNodeData?: (nodeId: string) => any;
+  nodeStatuses?: Record<string, string>;
+  onExecuteNode?: (nodeId: string) => void;
+  onExecuteWorkflow?: () => void;
+  onOpenNodeConfig?: (nodeId: string, nodeType: string) => void;
+  canEditNodes?: boolean;
 }
 
 export function EditorProvider({
   children,
-  ...value
-}: EditorContextValue & { children: ReactNode }) {
+  onUpdateNodeData,
+  onDeleteNode,
+  onAddNode,
+  onDuplicateNode,
+  getNodeData,
+  nodeStatuses,
+  onExecuteNode,
+  onExecuteWorkflow,
+  onOpenNodeConfig,
+  canEditNodes = false,
+}: EditorProviderProps) {
+  const contextValue: EditorContextType = {
+    updateNodeData: onUpdateNodeData || (() => {}),
+    deleteNode: onDeleteNode || (() => {}),
+    addNode: onAddNode || (() => {}),
+    duplicateNode: onDuplicateNode || (() => {}),
+    getNodeData: getNodeData || (() => null),
+    nodeStatuses: nodeStatuses || {},
+    executeNode: onExecuteNode,
+    executeWorkflow: onExecuteWorkflow,
+    openNodeConfig: onOpenNodeConfig,
+    canEditNodes,
+  };
   return (
-    <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
+    <EditorContext.Provider value={contextValue}>
+      {children}
+    </EditorContext.Provider>
   );
 }
-
-export default EditorProvider;
+export function useEditor() {
+  const context = useContext(EditorContext);
+  if (!context) {
+    throw new Error("useEditor must be used within an EditorProvider");
+  }
+  return context;
+}
+export const runtimeCallbacks = {};
