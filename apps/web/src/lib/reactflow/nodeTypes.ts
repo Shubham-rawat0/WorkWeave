@@ -1,14 +1,41 @@
-import type { NodeTypes } from "@xyflow/react";
-import { ManualTriggerNode } from "./nodes/ManualTriggerNode";
-import { OpenAiNode } from "./nodes/OpenAiNode";
-import { ConditionNode } from "./nodes/ConditionNode";
-import { SlackNode } from "./nodes/SlackNode";
-import { LogNode } from "./nodes/LogNode";
+import {
+  AINode,
+  AnthropicNode,
+  ConditionNode,
+  CronTriggerNode,
+  DelayNode,
+  DiscordNode,
+  FilterNode,
+  GeminiNode,
+  GitHubNode,
+  HTTPNode,
+  LogNode,
+  NotionNode,
+  OpenAINode,
+  SlackNode,
+  TransformNode,
+  TriggerNode,
+  WebhookTriggerNode,
+} from "@/components/workflow/config";
 
-export const nodeTypes: NodeTypes = {
-  manualTrigger: ManualTriggerNode,
-  openaiNode: OpenAiNode,
-  conditionNode: ConditionNode,
+export const nodeTypes = {
+  aiNode: AINode,
+  triggerNode: TriggerNode,
+  httpTrigger: HTTPNode,
+  githubNode: GitHubNode,
+  notionNode: NotionNode,
+  openaiNode: OpenAINode,
+  geminiNode: GeminiNode,
+  anthropicNode: AnthropicNode,
   slackNode: SlackNode,
+  discordNode: DiscordNode,
+  manualTrigger: TriggerNode,
+  webhookTrigger: WebhookTriggerNode,
+  cronTrigger: CronTriggerNode,
+  conditionNode: ConditionNode,
+  delayNode: DelayNode,
   logNode: LogNode,
-};
+  transformNode: TransformNode,
+  filterNode: FilterNode,
+} as const;
+export type NodeType = keyof typeof nodeTypes;
