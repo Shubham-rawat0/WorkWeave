@@ -3,7 +3,11 @@ import { ConditionNodeData, NodeExecutionOutput } from "../../engine/types";
 
 interface Rule {
     route: string;
-    operator: "equals" | "contains" | "not_equals";
+    operator:
+        | "equals"
+        | "contains"
+        | "not_equals"
+        | "greater_than_or_equal";
     value: string;
 }
 
@@ -45,6 +49,15 @@ function matchesRule(value: string, rule: Rule): boolean {
             return value!==comparison
         case "contains":
             return value.includes(comparison)
+        case "greater_than_or_equal": {
+            const numericValue = Number(value);
+            const numericComparison = Number(comparison);
+            return (
+                Number.isFinite(numericValue) &&
+                Number.isFinite(numericComparison) &&
+                numericValue >= numericComparison
+            );
+        }
         default:
             return false
     }

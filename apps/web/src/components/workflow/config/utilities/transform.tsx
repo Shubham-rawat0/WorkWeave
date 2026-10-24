@@ -28,9 +28,13 @@ export function TransformConfig({ data, onSave }: ConfigProps) {
         label="Output Template"
         value={expression}
         onChange={setExpression}
-        placeholder={'{\n  "id": "{{previousNode.data.id}}"\n}'}
+        placeholder={'{\n  "id": "{{previousNode.id}}"\n}'}
         rows={7}
       />
+      <p className="text-xs text-white/40">
+        Use {"{{previousNode.field}}"} to reference output from the single node
+        connected directly before this node.
+      </p>
       <p className="text-xs text-white/40">
         Valid JSON output is returned as an object; other output is returned as
         text.

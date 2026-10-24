@@ -1,5 +1,5 @@
 import { getMainRedisClient } from "@WorkOrchestrator/shared/redis";
-import { NodeExecutionOutput, NodeRun, WorkflowNode } from "./types";
+import { NodeExecutionOutput, NodeRun, WorkflowEdge, WorkflowNode } from "./types";
 import { executeAINode, executeConditionNode, executeCronTrigger, executeDelayNode, executeFilterNode, executeGitHubNode, executeHTTPNode, executeLogNode, executeNotionNode, executeSlackNode, executeTransformNode, executeWebhookTriggerNode } from "../executor";
 import { NodeStatus, prisma } from "@WorkOrchestrator/prisma";
 
@@ -205,6 +205,7 @@ async function executNodeLogic(
         case "triggerNode":
         case "manualTrigger":
             return {
+                ...(node.data.payload ?? {}),
                 triggeredAt: new Date().toISOString(),
                 source: "manual",
             };
@@ -230,6 +231,7 @@ export async function executeNode(
     existingNodeRuns: NodeRun[],
     ownerUserId: string,
     nodeById?: Map<string, WorkflowNode>,
+    incomingEdges: WorkflowEdge[] = [],
 ): Promise<void> {
     let nodeRun = findNodeRunForNode(existingNodeRuns, node.id);
     if (nodeRun) {
@@ -302,6 +304,12 @@ export async function executeNode(
                         providerOutputs[providerAlias] = existingProviderOutputs;
                     }
                 }
+            }
+        }
+        if (incomingEdges.length === 1) {
+            const previousOutput = runMetadata[incomingEdges[0]!.source];
+            if (previousOutput !== undefined) {
+                runMetadata.previousNode = previousOutput;
             }
         }
         // Expose a single AI output as `ai` for convenience.

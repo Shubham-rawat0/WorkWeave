@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import type { NodeProps } from "@xyflow/react";
+import { useUpdateNodeInternals } from "@xyflow/react";
 import { getNodeDef } from "@WorkOrchestrator/shared/nodeRegistry";
 import { getNodeIcon } from "../nodeIcons";
 import BaseNode from "./baseNode";
@@ -11,6 +13,7 @@ export function WorkflowTypeNode({
   data,
   selected,
 }: NodeProps) {
+  const updateNodeInternals = useUpdateNodeInternals();
   const definition = getNodeDef(type);
   const nodeData =
     data && typeof data === "object"
@@ -61,6 +64,11 @@ export function WorkflowTypeNode({
       top: `${((index + 1) / (routes.length + 1)) * 100}%`,
     }));
   }
+
+  const sourceHandleIds = sourceHandles?.map((handle) => handle.id).join(",");
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, sourceHandleIds, updateNodeInternals]);
 
   return (
     <BaseNode

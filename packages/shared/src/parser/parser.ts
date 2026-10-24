@@ -54,10 +54,7 @@ function resolvePath(values: Record<string, any>, keys: string[]): any {
 }
 
 /**
- * Renders `template` and reports which placeholders could not be resolved.
- * Delimiters are treated as single characters.
- * 
- * maps expression to values
+ * Renders single- or double-braced placeholders and reports unresolved values.
  */
 export function parseTemplateWithMetadata(
     template: string,
@@ -74,13 +71,55 @@ export function parseTemplateWithMetadata(
     let hasSubstitutions = false;
     let literalStart = 0;
     let i = 0;
+
+    function appendToken(token: ParsedTemplateToken): void {
+        chunks.push(template.slice(literalStart, i));
+        hasSubstitutions = true;
+        const value = resolvePath(values, token.lookupKey.split("."));
+        if (value === undefined || value === null) {
+            missingVars.push(token.lookupKey);
+        } else {
+            const rendered = token.useJson
+                ? JSON.stringify(value)
+                : String(value);
+            chunks.push(String(rendered));
+        }
+    }
+
     while (i < template.length) {
         if (template[i] !== startDelimiter) {
             i++;
             continue;
         }
-        // Scan for the closing delimiter; multi-char end delimiters never match
-        // (the original comparison is char-by-char), so -1 means "literal rest".
+        if (
+            startDelimiter.length === 1 &&
+            endDelimiter.length === 1 &&
+            template.startsWith(startDelimiter.repeat(2), i)
+        ) {
+            const doubleDelimiterLength = 2;
+            const close = template.indexOf(
+                endDelimiter.repeat(2),
+                i + doubleDelimiterLength,
+            );
+            if (close === -1) {
+                i += doubleDelimiterLength;
+                continue;
+            }
+            const token = parseTemplateToken(
+                template.slice(i + doubleDelimiterLength, close),
+                startDelimiter,
+                endDelimiter,
+            );
+            if (token) {
+                appendToken(token);
+                i = close + doubleDelimiterLength;
+                literalStart = i;
+            } else {
+                i = close + doubleDelimiterLength;
+            }
+            continue;
+        }
+        // Scan for the closing delimiter used by single-braced placeholders.
         let close = -1;
         for (let j = i + 1; j < template.length; j++) {
             if (template[j] === endDelimiter) {
@@ -102,19 +141,7 @@ export function parseTemplateWithMetadata(
             i++;
             continue;
         }
-        // Flush the literal run, then the substituted value.
-        chunks.push(template.slice(literalStart, i));
-        hasSubstitutions = true;
-        const { useJson, lookupKey } = token;
-        const value = resolvePath(values, lookupKey.split("."));
-        if (value === undefined || value === null) {
-            missingVars.push(lookupKey);
-        } else {
-            const rendered = useJson ? JSON.stringify(value) : String(value);
-            // JSON.stringify returns undefined for functions/symbols; String()
-            // preserves the previous coercion so output stays predictable.
-            chunks.push(String(rendered));
-        }
+        appendToken(token);
         i = close + 1;
         literalStart = i;
     }

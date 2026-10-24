@@ -38,8 +38,12 @@ export function LogConfig({ data, onSave }: ConfigProps) {
         label="Message"
         value={message}
         onChange={setMessage}
-        placeholder="Processed {{previousNode.data.id}}"
+        placeholder="Processed {{previousNode.id}}"
       />
+      <p className="text-xs text-white/40">
+        Use {"{{previousNode.field}}"} to reference output from the single node
+        connected directly before this node.
+      </p>
       <SelectField
         label="Log Level"
         value={level}

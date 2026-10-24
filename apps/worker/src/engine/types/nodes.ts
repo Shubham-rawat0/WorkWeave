@@ -84,7 +84,11 @@ export interface CronTriggerNodeData {
 }
 export interface ConditionRule {
     route: string;
-    operator: "equals" | "contains" | "not_equals";
+    operator:
+        | "equals"
+        | "contains"
+        | "not_equals"
+        | "greater_than_or_equal";
     value: string;
 }
 export interface ConditionNodeData {

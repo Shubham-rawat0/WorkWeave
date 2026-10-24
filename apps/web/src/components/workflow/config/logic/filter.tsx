@@ -41,8 +41,12 @@ export function FilterConfig({ data, onSave }: ConfigProps) {
         label="Expression"
         value={expression}
         onChange={setExpression}
-        placeholder="{{previousNode.data.status}}"
+        placeholder="{{previousNode.status}}"
       />
+      <p className="text-xs text-white/40">
+        Use {"{{previousNode.field}}"} to reference output from the single node
+        connected directly before this node.
+      </p>
       <SelectField
         label="Operator"
         value={operator}

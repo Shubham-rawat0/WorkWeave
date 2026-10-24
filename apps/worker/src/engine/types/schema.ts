@@ -34,7 +34,12 @@ const conditionNodeDataSchema = z
             .array(
                 z.object({
                     route: z.string(),
-                    operator: z.enum(["equals", "contains", "not_equals"]),
+                    operator: z.enum([
+                        "equals",
+                        "contains",
+                        "not_equals",
+                        "greater_than_or_equal",
+                    ]),
                     value: z.string(),
                 }),
             )
@@ -322,9 +327,18 @@ const workflowEdgeSchema = z
         id: z.string(),
         source: z.string(),
         target: z.string(),
-        sourceHandle: z.string().optional(),
-        targetHandle: z.string().optional(),
-        data: z.record(z.string(),z.unknown()).optional(),
+        sourceHandle: z
+            .string()
+            .nullish()
+            .transform((value) => value ?? undefined),
+        targetHandle: z
+            .string()
+            .nullish()
+            .transform((value) => value ?? undefined),
+        data: z
+            .record(z.string(), z.unknown())
+            .nullish()
+            .transform((value) => value ?? undefined),
     })
     .loose();
 export const workflowNodeArraySchema = z.array(workflowNodeSchema);

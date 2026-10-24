@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -106,6 +106,29 @@ function toFlowEdges(rawEdges: unknown): Edge[] {
   });
 }
 
+function getWorkflowSnapshot(nodes: Node[], edges: Edge[]) {
+  return {
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      position: node.position,
+      data: getNodeData(node),
+    })),
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle ?? null,
+      targetHandle: edge.targetHandle ?? null,
+      data: edge.data ?? null,
+    })),
+  };
+}
+
+function getWorkflowSnapshotKey(nodes: Node[], edges: Edge[]) {
+  return JSON.stringify(getWorkflowSnapshot(nodes, edges));
+}
+
 type ActionStatus = { type: "success" | "error"; message: string } | null;
 
 function CloudMark({ className }: { className?: string }) {
@@ -143,6 +166,9 @@ export default function WorkflowPage() {
     nodeId: string;
     nodeType: string;
   } | null>(null);
+  const lastPersistedWorkflow = useRef<string | null>(null);
+  const loadedWorkflowId = useRef<string | null>(null);
+  const persistQueue = useRef<Promise<void>>(Promise.resolve());
 
   usePageTitle(
     loadError ? "Workflow unavailable" : (workflowName ?? "Loading…"),
@@ -155,14 +181,23 @@ export default function WorkflowPage() {
     setLoadError(null);
     setStatus(null);
     setConfigTarget(null);
+    loadedWorkflowId.current = null;
+    lastPersistedWorkflow.current = null;
 
     api
       .workflow(id)
       .then(({ workflow, webhookEndpoints: loadedWebhookEndpoints }) => {
         if (cancelled) return;
+        const loadedNodes = toFlowNodes(workflow.nodes);
+        const loadedEdges = toFlowEdges(workflow.edges);
         setWorkflowName(workflow.title);
-        setNodes(toFlowNodes(workflow.nodes));
-        setEdges(toFlowEdges(workflow.edges));
+        setNodes(loadedNodes);
+        setEdges(loadedEdges);
+        loadedWorkflowId.current = id;
+        lastPersistedWorkflow.current = getWorkflowSnapshotKey(
+          loadedNodes,
+          loadedEdges,
+        );
         setWebhookEndpoints(loadedWebhookEndpoints);
       })
       .catch((requestError: unknown) => {
@@ -308,30 +343,62 @@ export default function WorkflowPage() {
     [nodes, edges],
   );
 
-  const persistWorkflow = useCallback(async () => {
-    const { workflow, webhookEndpoints: updatedWebhookEndpoints } =
-      await api.updateWorkflow({
-        id,
-        nodes: nodes.map((node) => ({
-          id: node.id,
-          type: node.type,
-          position: node.position,
-          data: getNodeData(node),
-        })),
-        edges: edges.map((edge) => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          sourceHandle: edge.sourceHandle ?? null,
-          targetHandle: edge.targetHandle ?? null,
-          data: edge.data ?? null,
-        })),
+  const persistWorkflow = useCallback(
+    (nodesToPersist: Node[], edgesToPersist: Edge[]) => {
+      const snapshot = getWorkflowSnapshot(nodesToPersist, edgesToPersist);
+      const persist = persistQueue.current.then(async () => {
+        const {
+          workflow,
+          webhookEndpoints: updatedWebhookEndpoints,
+        } = await api.updateWorkflow({
+          id,
+          ...snapshot,
+        });
+
+        lastPersistedWorkflow.current = JSON.stringify(snapshot);
+        setWebhookEndpoints(updatedWebhookEndpoints);
+        setWorkflowName(workflow.title);
+        return workflow;
       });
 
-    setWebhookEndpoints(updatedWebhookEndpoints);
-    setWorkflowName(workflow.title);
-    return workflow;
-  }, [id, nodes, edges]);
+      persistQueue.current = persist.then(
+        () => undefined,
+        () => undefined,
+      );
+      return persist;
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    if (isLoading || loadedWorkflowId.current !== id) return;
+
+    const snapshotKey = getWorkflowSnapshotKey(nodes, edges);
+    if (snapshotKey === lastPersistedWorkflow.current) return;
+
+    const timeout = window.setTimeout(() => {
+      if (snapshotKey === lastPersistedWorkflow.current) return;
+
+      void persistWorkflow(nodes, edges).then(
+        () => {
+          setStatus((currentStatus) =>
+            currentStatus?.type === "error" ? null : currentStatus,
+          );
+        },
+        (error: unknown) => {
+          setStatus({
+            type: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Failed to save workflow.",
+          });
+        },
+      );
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [edges, id, isLoading, nodes, persistWorkflow]);
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
@@ -340,7 +407,7 @@ export default function WorkflowPage() {
     setIsSaving(true);
     setStatus(null);
     try {
-      await persistWorkflow();
+      await persistWorkflow(nodes, edges);
     } catch (error) {
       setStatus({
         type: "error",
@@ -359,7 +426,7 @@ export default function WorkflowPage() {
       }
       setIsSaving(false);
     }
-  }, [isSaving, persistWorkflow]);
+  }, [edges, isSaving, nodes, persistWorkflow]);
 
   const runWorkflow = useCallback(
     async (
@@ -380,7 +447,7 @@ export default function WorkflowPage() {
       setIsExecuting(true);
       setStatus(null);
       try {
-        await persistWorkflow();
+        await persistWorkflow(nodes, edges);
         const result = await api.executeWorkflow({
           workflowId: id,
           ...body,
@@ -401,7 +468,7 @@ export default function WorkflowPage() {
         setIsExecuting(false);
       }
     },
-    [id, isExecuting, persistWorkflow, validation],
+    [edges, id, isExecuting, nodes, persistWorkflow, validation],
   );
 
   const handleExecuteWorkflow = useCallback(() => {

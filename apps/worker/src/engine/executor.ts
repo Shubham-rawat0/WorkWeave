@@ -173,9 +173,17 @@ async function executeSingleNode(
     nodeRuns: NodeRun[],
     nodeById: Map<string, WorkflowNode>,
     ownerUserId: string,
+    incomingEdges: WorkflowEdge[],
 ): Promise<BatchResult> {
     try {
-        await executeNode(workflowRunId,node,nodeRuns,ownerUserId,nodeById)
+        await executeNode(
+            workflowRunId,
+            node,
+            nodeRuns,
+            ownerUserId,
+            nodeById,
+            incomingEdges,
+        )
         return { nodeId: node.id, success: true };
     } catch (error) {
         console.error(
@@ -243,7 +251,7 @@ function shouldSkipNode(
 ): boolean {
     const incomingEdges = incomingByTarget.get(node.id) ?? []
     if (incomingEdges.length === 0) {
-        return true
+        return false
     }
 
     const activeSources:string[]=[]
@@ -610,6 +618,7 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
                 currentNodeRuns,
                 allNodesById,
                 ownerUserId,
+                edges.filter((edge) => edge.target === targetNode.id),
             );
             await updateWorkflowStatus(
                 workflowRunId,
@@ -820,7 +829,12 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
 
             const results=await Promise.all(
                 nodesToExecute.map((node)=>executeSingleNode(
-                    workflowRunId,node,currentNodeRuns,nodeById,ownerUserId
+                    workflowRunId,
+                    node,
+                    currentNodeRuns,
+                    nodeById,
+                    ownerUserId,
+                    incomingByTarget.get(node.id) ?? [],
                 ))
             )
 

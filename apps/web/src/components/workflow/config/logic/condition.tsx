@@ -29,7 +29,12 @@ export function ConditionConfig({ data, onSave }: ConfigProps) {
           (rule) =>
             !rule ||
             typeof rule.route !== "string" ||
-            !["equals", "contains", "not_equals"].includes(rule.operator) ||
+            ![
+              "equals",
+              "contains",
+              "not_equals",
+              "greater_than_or_equal",
+            ].includes(rule.operator) ||
             typeof rule.value !== "string",
         )
       ) {
@@ -41,6 +46,12 @@ export function ConditionConfig({ data, onSave }: ConfigProps) {
       onSave({
         expression,
         defaultRoute,
+        routes: [
+          ...new Set([
+            ...rules.map((rule: { route: string }) => rule.route),
+            defaultRoute,
+          ]),
+        ],
         rules,
         rulesJson,
         responseName: responseName || undefined,
@@ -62,9 +73,13 @@ export function ConditionConfig({ data, onSave }: ConfigProps) {
         label="Value Expression"
         value={expression}
         onChange={setExpression}
-        placeholder="{{previousNode.data.status}}"
+        placeholder="{{previousNode.age}}"
         rows={3}
       />
+      <p className="text-xs text-white/40">
+        Use {"{{previousNode.field}}"} to reference output from the single node
+        connected directly before this node.
+      </p>
       <TextField
         label="Default Route"
         value={defaultRoute}

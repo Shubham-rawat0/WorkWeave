@@ -136,6 +136,14 @@ export function NodeConfigDialog({
           <DialogTitle>{meta.title}</DialogTitle>
           <DialogDescription>{meta.subtitle}</DialogDescription>
         </DialogHeader>
+        {nodeId && (
+          <div className="rounded-md border border-[#444] bg-[#2D2D2E] px-3 py-2">
+            <p className="mb-1 text-xs text-white/50">Node ID</p>
+            <code className="block select-all break-all font-mono text-xs text-white/80">
+              {nodeId}
+            </code>
+          </div>
+        )}
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
