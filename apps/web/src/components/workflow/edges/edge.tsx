@@ -1,11 +1,11 @@
 "use client";
-import React, { memo } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import {
   EdgeLabelRenderer,
   getSmoothStepPath,
   type EdgeProps,
 } from "@xyflow/react";
-import { Trash2 } from "lucide-react";
+import { X } from "lucide-react";
 import { useEdgeDelete } from "./edgeActionsContext";
 
 function WorkflowEdgeComponent({
@@ -18,6 +18,21 @@ function WorkflowEdgeComponent({
   selected,
 }: EdgeProps) {
   const onDelete = useEdgeDelete();
+  const [isHovered, setIsHovered] = useState(false);
+  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showDelete = () => {
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    setIsHovered(true);
+  };
+  const hideDelete = () => {
+    hideTimeout.current = setTimeout(() => setIsHovered(false), 100);
+  };
+  useEffect(
+    () => () => {
+      if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    },
+    [],
+  );
   const edgeLabel =
     typeof (
       data as
@@ -71,13 +86,27 @@ function WorkflowEdgeComponent({
           }}
         />
 
+        {onDelete ? (
+          <path
+            d={edgePath}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={16}
+            pointerEvents="stroke"
+            onMouseEnter={showDelete}
+            onMouseLeave={hideDelete}
+          />
+        ) : null}
+
         <EdgeLabelRenderer>
           <div
             className="nodrag nopan absolute flex items-center gap-1"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              pointerEvents: "all",
+              pointerEvents: edgeLabel || isHovered ? "all" : "none",
             }}
+            onMouseEnter={showDelete}
+            onMouseLeave={hideDelete}
           >
             {edgeLabel ? (
               <span className="rounded-md border border-white/20 bg-black/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/70">
@@ -91,11 +120,13 @@ function WorkflowEdgeComponent({
                   event.stopPropagation();
                   onDelete(id);
                 }}
-                className="flex size-6 items-center justify-center rounded-md border border-[#5b5b5b] bg-[#1E1E1E] text-[#999] shadow-sm transition-colors hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-400"
+                className={`flex size-6 items-center justify-center bg-transparent text-red-500 transition-[opacity,color,transform] duration-150 hover:scale-110 hover:text-red-400 ${
+                  isHovered ? "opacity-100" : "pointer-events-none opacity-0"
+                }`}
                 title="Delete connection"
                 aria-label="Delete connection"
               >
-                <Trash2 className="size-3" />
+                <X className="size-5" strokeWidth={4} />
               </button>
             ) : null}
           </div>

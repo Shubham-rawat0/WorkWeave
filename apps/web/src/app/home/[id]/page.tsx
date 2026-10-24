@@ -14,7 +14,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import { Loader2, Plus, Save } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, type WebhookEndpoint } from "@/lib/api";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { EditorProvider } from "@/contexts/EditorContext";
 import WorkflowCanvas from "@/components/workflow/canvas";
@@ -115,6 +115,7 @@ export default function WorkflowPage() {
   const [workflowName, setWorkflowName] = useState<string | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [webhookEndpoints, setWebhookEndpoints] = useState<WebhookEndpoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -140,11 +141,12 @@ export default function WorkflowPage() {
 
     api
       .workflow(id)
-      .then(({ workflow }) => {
+      .then(({ workflow, webhookEndpoints: loadedWebhookEndpoints }) => {
         if (cancelled) return;
         setWorkflowName(workflow.title);
         setNodes(toFlowNodes(workflow.nodes));
         setEdges(toFlowEdges(workflow.edges));
+        setWebhookEndpoints(loadedWebhookEndpoints);
       })
       .catch((requestError: unknown) => {
         if (cancelled) return;
@@ -290,24 +292,26 @@ export default function WorkflowPage() {
   );
 
   const persistWorkflow = useCallback(async () => {
-    const { workflow } = await api.updateWorkflow({
-      id,
-      nodes: nodes.map((node) => ({
-        id: node.id,
-        type: node.type,
-        position: node.position,
-        data: getNodeData(node),
-      })),
-      edges: edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle ?? null,
-        targetHandle: edge.targetHandle ?? null,
-        data: edge.data ?? null,
-      })),
-    });
+    const { workflow, webhookEndpoints: updatedWebhookEndpoints } =
+      await api.updateWorkflow({
+        id,
+        nodes: nodes.map((node) => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: getNodeData(node),
+        })),
+        edges: edges.map((edge) => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle ?? null,
+          targetHandle: edge.targetHandle ?? null,
+          data: edge.data ?? null,
+        })),
+      });
 
+    setWebhookEndpoints(updatedWebhookEndpoints);
     setWorkflowName(workflow.title);
     return workflow;
   }, [id, nodes, edges]);
@@ -315,11 +319,11 @@ export default function WorkflowPage() {
   const handleSave = useCallback(async () => {
     if (isSaving) return;
 
+    const saveStartedAt = Date.now();
     setIsSaving(true);
     setStatus(null);
     try {
       await persistWorkflow();
-      setStatus({ type: "success", message: "Workflow saved." });
     } catch (error) {
       setStatus({
         type: "error",
@@ -327,6 +331,15 @@ export default function WorkflowPage() {
           error instanceof Error ? error.message : "Failed to save workflow.",
       });
     } finally {
+      const remainingAnimationTime = Math.max(
+        0,
+        2000 - (Date.now() - saveStartedAt),
+      );
+      if (remainingAnimationTime > 0) {
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, remainingAnimationTime),
+        );
+      }
       setIsSaving(false);
     }
   }, [isSaving, persistWorkflow]);
@@ -403,6 +416,13 @@ export default function WorkflowPage() {
     () => (configTarget ? getNodeDataById(configTarget.nodeId) : {}),
     [configTarget, getNodeDataById],
   );
+  const configWebhookUrl = useMemo(
+    () =>
+      webhookEndpoints.find(
+        (endpoint) => endpoint.nodeId === configTarget?.nodeId,
+      )?.url,
+    [configTarget?.nodeId, webhookEndpoints],
+  );
 
   if (isLoading) {
     return (
@@ -468,6 +488,7 @@ export default function WorkflowPage() {
           nodeId={configTarget?.nodeId ?? ""}
           nodeType={configTarget?.nodeType ?? ""}
           nodeData={configNodeData}
+          webhookUrl={configWebhookUrl}
           onSave={handleUpdateNodeData}
         />
       </EditorProvider>
@@ -477,14 +498,23 @@ export default function WorkflowPage() {
           type="button"
           onClick={() => void handleSave()}
           disabled={isSaving}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#333333] bg-[#1E1E1E] px-3 text-sm font-medium text-[#e8e6e1] transition-colors hover:border-[#F04D26]/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="relative inline-flex h-9 items-center gap-2 overflow-hidden rounded-lg border border-[#333333] bg-[#1E1E1E] px-3 text-sm font-medium text-[#e8e6e1] transition-colors hover:border-[#F04D26]/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-80"
         >
           {isSaving ? (
-            <Loader2 className="size-4 animate-spin" />
+            <>
+              <Save className="size-4 opacity-40" />
+              <div className="save-feedback save-feedback--btn">
+                <span className="save-feedback__bar" />
+                <span className="save-feedback__bar" />
+                <span className="save-feedback__bar" />
+              </div>
+            </>
           ) : (
-            <Save className="size-4" />
+            <>
+              <Save className="size-4" />
+              Save
+            </>
           )}
-          Save
         </button>
         <button
           type="button"
@@ -494,6 +524,7 @@ export default function WorkflowPage() {
         >
           <Plus className="size-5" />
         </button>
+        {null}
       </div>
 
       {status && (

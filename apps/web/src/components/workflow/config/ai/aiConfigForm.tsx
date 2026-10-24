@@ -97,7 +97,7 @@ export function AIConfigForm({
     missingFields.push(inputMode === "json" ? "JSON Input" : "Prompt");
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     onSave({
       responseName,

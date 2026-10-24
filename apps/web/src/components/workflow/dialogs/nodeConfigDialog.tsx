@@ -36,6 +36,7 @@ interface NodeConfigDialogProps {
   nodeId: string;
   nodeType: string;
   nodeData: Record<string, any>;
+  webhookUrl?: string;
   onSave: (nodeId: string, data: Record<string, any>) => void | Promise<void>;
 }
 const FALLBACK_META = {
@@ -56,10 +57,12 @@ export function NodeConfigDialog({
   nodeId,
   nodeType,
   nodeData,
+  webhookUrl,
   onSave,
 }: NodeConfigDialogProps) {
   const meta = getConfigMeta(nodeType);
   const [isSaving, setIsSaving] = useState(false);
+
   const handleSave = async (data: Record<string, any>) => {
     if (isSaving) return;
     try {
@@ -74,6 +77,7 @@ export function NodeConfigDialog({
       setIsSaving(false);
     }
   };
+
   const renderConfig = () => {
     switch (nodeType) {
       case "aiNode":
@@ -99,8 +103,8 @@ export function NodeConfigDialog({
       case "webhookTrigger":
         return (
           <WebhookTriggerConfig
-            nodeId={nodeId}
             data={nodeData}
+            webhookUrl={webhookUrl}
             onSave={handleSave}
           />
         );
@@ -124,6 +128,7 @@ export function NodeConfigDialog({
         );
     }
   };
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">

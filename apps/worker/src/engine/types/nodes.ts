@@ -72,8 +72,6 @@ export interface ManualTriggerNodeData {
     payload?: Record<string, unknown>;
 }
 export interface WebhookTriggerNodeData {
-    secret?: string;
-    routeKey?: string;
     responseName?: string;
 }
 export interface CronTriggerNodeData {

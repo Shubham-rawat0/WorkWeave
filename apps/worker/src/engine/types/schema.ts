@@ -9,8 +9,6 @@ const positionSchema = z.object({
 });
 const webhookTriggerNodeDataSchema = z
     .object({
-        secret: z.string().optional(),
-        routeKey: z.string().optional(),
         responseName: z.string().optional(),
     })
     .loose();

@@ -14,7 +14,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -165,6 +165,7 @@ function WorkflowCanvasInner({
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
   const hasNodes = nodes.length > 0;
   const [isPending, startTransition] = useTransition();
+  const [showValidationDetails, setShowValidationDetails] = useState(false);
 
   const hasActiveManualTrigger = useMemo(
     () =>
@@ -227,6 +228,12 @@ function WorkflowCanvasInner({
     (issue) => issue.type === "error",
   );
   const hasValidationWarnings = validation.issues.some(
+    (issue) => issue.type === "warning",
+  );
+  const validationErrors = validation.issues.filter(
+    (issue) => issue.type === "error",
+  );
+  const validationWarnings = validation.issues.filter(
     (issue) => issue.type === "warning",
   );
   const isCronRunButton = runNowCandidate?.source === "cron";
@@ -432,36 +439,80 @@ function WorkflowCanvasInner({
               type="button"
               onClick={handleTidyUp}
               disabled={!hasNodes}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#333333] bg-[#1E1E1E] px-2.5 text-xs font-medium text-[#c9c9c5] transition-colors hover:border-[#F04D26]/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              title="Tidy up workflow"
+              aria-label="Tidy up workflow"
+              className="inline-flex size-8 items-center justify-center rounded-md border border-[#333333] bg-[#1E1E1E] text-[#c9c9c5] transition-colors hover:border-[#F04D26]/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Sparkles className="size-3.5" />
-              Tidy up
             </button>
+            {hasValidationErrors || hasValidationWarnings ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowValidationDetails((isOpen) => !isOpen)}
+                  aria-expanded={showValidationDetails}
+                  aria-controls="workflow-validation-details"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#333333] bg-[#1E1E1E] px-2.5 text-xs font-medium text-[#c9c9c5] shadow-lg transition-colors hover:bg-white/5 hover:text-white"
+                >
+                  <AlertTriangle
+                    className={`size-3.5 ${
+                      hasValidationErrors ? "text-red-400" : "text-amber-400"
+                    }`}
+                  />
+                  {validationErrors.length > 0
+                    ? `${validationErrors.length} error${validationErrors.length === 1 ? "" : "s"}`
+                    : null}
+                  {validationErrors.length > 0 &&
+                  validationWarnings.length > 0
+                    ? " · "
+                    : null}
+                  {validationWarnings.length > 0
+                    ? `${validationWarnings.length} warning${validationWarnings.length === 1 ? "" : "s"}`
+                    : null}
+                </button>
+                {showValidationDetails ? (
+                  <div
+                    id="workflow-validation-details"
+                    className="absolute bottom-full left-0 mb-2 max-h-48 w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-[#333333] bg-[#1E1E1E] p-3 text-xs text-[#c9c9c5] shadow-xl"
+                  >
+                    <ul className="space-y-2">
+                      {validation.issues.map((issue, index) => (
+                        <li
+                          key={`${issue.type}-${issue.message}-${index}`}
+                          className="flex items-start gap-2"
+                        >
+                          <AlertTriangle
+                            className={`mt-0.5 size-3.5 shrink-0 ${
+                              issue.type === "error"
+                                ? "text-red-400"
+                                : "text-amber-400"
+                            }`}
+                          />
+                          <span>
+                            <span
+                              className={`mr-1 font-medium ${
+                                issue.type === "error"
+                                  ? "text-red-300"
+                                  : "text-amber-300"
+                              }`}
+                            >
+                              {issue.type === "error" ? "Error:" : "Warning:"}
+                            </span>
+                            {issue.message}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : hasNodes ? (
+              <div className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#333333] bg-[#1E1E1E] px-2.5 text-xs font-medium text-[#c9c9c5] shadow-lg">
+                <CheckCircle2 className="size-3.5 text-emerald-400" />
+                Workflow valid
+              </div>
+            ) : null}
           </div>
-
-          {hasValidationErrors ? (
-            <div className="rounded-lg border border-red-500/30 bg-[#1a1414]/95 px-3 py-2 text-xs text-red-300 shadow-lg backdrop-blur">
-              <p className="flex items-center gap-1.5 font-medium">
-                <AlertTriangle className="size-3.5" />
-                {validation.issues.filter((issue) => issue.type === "error")
-                  .length}{" "}
-                validation error(s)
-              </p>
-              <ul className="mt-1 space-y-0.5">
-                {validation.issues
-                  .filter((issue) => issue.type === "error")
-                  .slice(0, 3)
-                  .map((issue, index) => (
-                    <li key={`${issue.message}-${index}`}>{issue.message}</li>
-                  ))}
-              </ul>
-            </div>
-          ) : hasNodes ? (
-            <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-[#121a14]/95 px-3 py-1.5 text-xs text-emerald-300 shadow-lg backdrop-blur">
-              <CheckCircle2 className="size-3.5" />
-              {hasValidationWarnings ? "Ready with warnings" : "Workflow valid"}
-            </div>
-          ) : null}
         </Panel>
         </ReactFlow>
       </EdgeDeleteContext.Provider>

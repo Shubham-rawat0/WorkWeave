@@ -312,6 +312,94 @@ body {
   backdrop-filter: blur(26px) saturate(185%);
 }
 
+.save-feedback {
+  pointer-events: none;
+}
+
+.save-feedback--btn {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.save-feedback--btn::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(105deg, transparent 28%, rgb(240 77 38 / 8%) 38%, rgb(251 146 60 / 36%) 50%, rgb(240 77 38 / 8%) 62%, transparent 72%);
+  transform: translateX(-100%);
+  animation: save-btn-sweep 2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.save-feedback--btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(#f04d26, #f04d26) left top / 9px 1px no-repeat,
+    linear-gradient(#f04d26, #f04d26) left top / 1px 6px no-repeat,
+    linear-gradient(#f04d26, #f04d26) right top / 9px 1px no-repeat,
+    linear-gradient(#f04d26, #f04d26) right top / 1px 6px no-repeat,
+    linear-gradient(#f04d26, #f04d26) left bottom / 9px 1px no-repeat,
+    linear-gradient(#f04d26, #f04d26) left bottom / 1px 6px no-repeat,
+    linear-gradient(#f04d26, #f04d26) right bottom / 9px 1px no-repeat,
+    linear-gradient(#f04d26, #f04d26) right bottom / 1px 6px no-repeat;
+  border-radius: inherit;
+  opacity: 0;
+  animation: save-btn-frame 2s ease-out both;
+}
+
+.save-feedback__bar {
+  position: relative;
+  z-index: 1;
+  width: 5px;
+  height: 2px;
+  margin: 0 1px;
+  background: rgb(240 77 38 / 18%);
+  animation: save-btn-seq 1760ms ease-out both;
+}
+
+.save-feedback__bar:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.save-feedback__bar:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+@keyframes save-btn-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes save-btn-frame {
+  0%, 70% { opacity: 0; }
+  15%, 48% { opacity: 0.8; }
+  100% { opacity: 0.35; }
+}
+
+@keyframes save-btn-seq {
+  0%, 12% { background: rgb(240 77 38 / 18%); box-shadow: none; }
+  22%, 68% { background: #fb923c; box-shadow: 0 0 5px rgb(240 77 38 / 45%); }
+  88%, 100% { background: rgb(240 77 38 / 18%); box-shadow: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-feedback--btn::before,
+  .save-feedback--btn::after,
+  .save-feedback__bar {
+    animation: none;
+  }
+}
+
 .liquid-glass-header::before {
   position: absolute;
   z-index: -1;

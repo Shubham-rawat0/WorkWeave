@@ -25,6 +25,9 @@ export type WorkflowStatus = Exclude<WorkflowSummary["lastRunStatus"], null>;
 export type WorkflowDetails = InferResponseType<
     (typeof client.api.v1.workflow)[":id"]["$get"]
 >["workflow"];
+export type WebhookEndpoint = InferResponseType<
+    (typeof client.api.v1.workflow)[":id"]["$get"]
+>["webhookEndpoints"][number];
 
 export type CredentialSummary = InferResponseType<
     typeof client.api.v1.credentials.$get
