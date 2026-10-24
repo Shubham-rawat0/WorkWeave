@@ -33,7 +33,6 @@ export function ConditionConfig({ data, onSave }: ConfigProps) {
               "equals",
               "contains",
               "not_equals",
-              "greater_than_or_equal",
             ].includes(rule.operator) ||
             typeof rule.value !== "string",
         )
@@ -95,6 +94,9 @@ export function ConditionConfig({ data, onSave }: ConfigProps) {
         }}
         rows={8}
       />
+      <p className="text-xs text-white/40">
+  {"Format: [{ route, operator: equals|contains|not_equals, value }]"}
+</p>
       <ResponseNameField value={responseName} onChange={setResponseName} />
       {parseError && (
         <p role="alert" className="text-sm text-red-400">

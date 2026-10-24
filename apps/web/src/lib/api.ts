@@ -138,6 +138,18 @@ export const api = {
             typeof client.api.v1.workflow.execute.$post
         >["json"],
     ) => unwrap(client.api.v1.workflow.execute.$post({ json: body })),
+    workflowRun: (id: string) =>
+        unwrap(
+            client.api.v1.workflow.workflow.run[":id"].$get({
+                param: { id },
+            }),
+        ),
+    executionStream: (id: string) =>
+        unwrap(
+            client.api.v1.workflow.workflow.run[":id"].stream.$get({
+                param: { id },
+            }),
+        ),
     credentials: () => unwrap(client.api.v1.credentials.$get()),
     createCredential: (
         body: InferRequestType<

@@ -14,7 +14,6 @@ import {
   ConditionConfig,
   CronTriggerConfig,
   DelayConfig,
-  DiscordConfig,
   FilterConfig,
   GeminiConfig,
   GitHubConfig,
@@ -87,8 +86,6 @@ export function NodeConfigDialog({
         return <GeminiConfig data={nodeData} onSave={handleSave} />;
       case "anthropicNode":
         return <AnthropicConfig data={nodeData} onSave={handleSave} />;
-      case "discordNode":
-        return <DiscordConfig data={nodeData} onSave={handleSave} />;
       case "slackNode":
         return <SlackConfig data={nodeData} onSave={handleSave} />;
       case "httpTrigger":
@@ -131,7 +128,7 @@ export function NodeConfigDialog({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto scrollbar-thin">
         <DialogHeader>
           <DialogTitle>{meta.title}</DialogTitle>
           <DialogDescription>{meta.subtitle}</DialogDescription>

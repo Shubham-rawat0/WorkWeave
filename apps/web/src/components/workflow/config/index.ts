@@ -4,8 +4,6 @@ export { GeminiConfig } from "./ai/gemini";
 export { GeminiConfig as GeminiNode } from "./ai/gemini";
 export { OpenAIConfig } from "./ai/openai";
 export { OpenAIConfig as AINode, OpenAIConfig as OpenAINode } from "./ai/openai";
-export { DiscordConfig } from "./integrations/discord";
-export { DiscordConfig as DiscordNode } from "./integrations/discord";
 export { GitHubConfig } from "./integrations/github";
 export { GitHubConfig as GitHubNode } from "./integrations/github";
 export { HTTPConfig } from "./integrations/http";

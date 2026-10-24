@@ -138,7 +138,7 @@ export function PlaygroundNodeConfigDialog({
       onMouseDown={() => onOpenChange(false)}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-[#333333] bg-[#1e1e1e] p-5 shadow-[0_16px_60px_rgba(0,0,0,0.6)]"
+        className="w-full max-w-md max-h-[85vh] overflow-y-auto scrollbar-thin rounded-2xl border border-[#333333] bg-[#1e1e1e] p-5 shadow-[0_16px_60px_rgba(0,0,0,0.6)]"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

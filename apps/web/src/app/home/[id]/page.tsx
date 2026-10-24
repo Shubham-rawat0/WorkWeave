@@ -13,13 +13,16 @@ import {
   type OnNodesChange,
   type Node,
 } from "@xyflow/react";
-import { ArrowUp, Loader2, Plus } from "lucide-react";
+import { Activity, ArrowUp, Loader2, Plus, X } from "lucide-react";
 import { api, type WebhookEndpoint } from "@/lib/api";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { EditorProvider } from "@/contexts/EditorContext";
 import WorkflowCanvas from "@/components/workflow/canvas";
 import { AddNodeSidebar } from "@/components/workflow/addNodeSidebar";
 import { NodeConfigDialog } from "@/components/workflow/dialogs";
+import { ExecutionEventFeed } from "@/components/workflow/executionEventFeed";
+import { useExecutionStream } from "@/lib/execution/useExecutionStream";
+import type { ExecutionStreamBootstrap } from "@/lib/execution/stream";
 import { getNodeDef } from "@WorkOrchestrator/shared/nodeRegistry";
 import { validateWorkflow } from "@WorkOrchestrator/shared/core";
 
@@ -160,6 +163,10 @@ export default function WorkflowPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [streamBootstrap, setStreamBootstrap] =
+    useState<ExecutionStreamBootstrap | null>(null);
   const [status, setStatus] = useState<ActionStatus>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [configTarget, setConfigTarget] = useState<{
@@ -169,6 +176,11 @@ export default function WorkflowPage() {
   const lastPersistedWorkflow = useRef<string | null>(null);
   const loadedWorkflowId = useRef<string | null>(null);
   const persistQueue = useRef<Promise<void>>(Promise.resolve());
+  const executionStream = useExecutionStream(
+    activeRunId,
+    undefined,
+    streamBootstrap ?? undefined,
+  );
 
   usePageTitle(
     loadError ? "Workflow unavailable" : (workflowName ?? "Loading…"),
@@ -452,6 +464,9 @@ export default function WorkflowPage() {
           workflowId: id,
           ...body,
         });
+        setActiveRunId(result.runId);
+        setStreamBootstrap(result.stream ?? null);
+        setActivityOpen(true);
         setStatus({
           type: "success",
           message: `Run ${result.runId.slice(0, 8)} queued.`,
@@ -580,6 +595,20 @@ export default function WorkflowPage() {
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
         <button
           type="button"
+          onClick={() => setActivityOpen((open) => !open)}
+          aria-expanded={activityOpen}
+          aria-controls="workflow-run-events"
+          className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors ${
+            activityOpen
+              ? "border-[#F04D26]/60 bg-[#F04D26]/10 text-white"
+              : "border-[#333333] bg-[#1E1E1E] text-[#e8e6e1] hover:border-[#F04D26]/60 hover:text-white"
+          }`}
+        >
+          <Activity className="size-4" />
+          Run events
+        </button>
+        <button
+          type="button"
           onClick={() => void handleSave()}
           disabled={isSaving}
           aria-label={isSaving ? "Saving workflow to cloud" : "Save workflow to cloud"}
@@ -628,6 +657,45 @@ export default function WorkflowPage() {
         onOpenChange={setSidebarOpen}
         onAddNode={handleAddNode}
       />
+
+      {activityOpen && (
+        <aside
+          id="workflow-run-events"
+          aria-label="Workflow run events"
+          className="absolute bottom-0 right-0 top-0 z-30 flex w-[min(26rem,94vw)] flex-col border-l border-white/10 bg-[#171717] shadow-2xl"
+        >
+          <div className="flex items-center justify-end gap-3 border-b border-white/10 px-3 py-2">
+            {activeRunId && (
+              <Link
+                href={`/home/${encodeURIComponent(id)}/run/${encodeURIComponent(activeRunId)}`}
+                className="mr-auto text-xs text-[#87867c] hover:text-white"
+              >
+                Open full run
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => setActivityOpen(false)}
+              className="flex size-8 items-center justify-center rounded-md text-[#87867c] transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Close run events"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          {activeRunId ? (
+            <ExecutionEventFeed
+              events={executionStream.events}
+              state={executionStream.state}
+              connectionMessage={executionStream.connectionMessage}
+              runId={activeRunId}
+            />
+          ) : (
+            <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-[#87867c]">
+              Run this workflow to see its live events here.
+            </div>
+          )}
+        </aside>
+      )}
     </div>
   );
 }
