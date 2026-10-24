@@ -13,7 +13,7 @@ import {
   type OnNodesChange,
   type Node,
 } from "@xyflow/react";
-import { Loader2, Plus, Save } from "lucide-react";
+import { ArrowUp, Loader2, Plus } from "lucide-react";
 import { api, type WebhookEndpoint } from "@/lib/api";
 import { usePageTitle } from "@/contexts/PageTitleContext";
 import { EditorProvider } from "@/contexts/EditorContext";
@@ -107,6 +107,23 @@ function toFlowEdges(rawEdges: unknown): Edge[] {
 }
 
 type ActionStatus = { type: "success" | "error"; message: string } | null;
+
+function CloudMark({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9.1 25h13.2a5.8 5.8 0 0 0 .5-11.58A8.25 8.25 0 0 0 6.88 15a5.05 5.05 0 0 0 2.22 10Z" />
+    </svg>
+  );
+}
 
 export default function WorkflowPage() {
   const params = useParams<{ id: string }>();
@@ -498,21 +515,20 @@ export default function WorkflowPage() {
           type="button"
           onClick={() => void handleSave()}
           disabled={isSaving}
+          aria-label={isSaving ? "Saving workflow to cloud" : "Save workflow to cloud"}
           className="relative inline-flex h-9 items-center gap-2 overflow-hidden rounded-lg border border-[#333333] bg-[#1E1E1E] px-3 text-sm font-medium text-[#e8e6e1] transition-colors hover:border-[#F04D26]/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-80"
         >
           {isSaving ? (
             <>
-              <Save className="size-4 opacity-40" />
-              <div className="save-feedback save-feedback--btn">
-                <span className="save-feedback__bar" />
-                <span className="save-feedback__bar" />
-                <span className="save-feedback__bar" />
-              </div>
+              <span className="save-cloud save-cloud--uploading" aria-hidden="true">
+                <CloudMark className="save-cloud__mark size-5" />
+                <ArrowUp className="save-cloud__arrow size-2.5" strokeWidth={2.5} />
+              </span>
+              <div className="save-feedback save-feedback--btn" />
             </>
           ) : (
             <>
-              <Save className="size-4" />
-              Save
+              <CloudMark className="save-cloud__mark size-5" />
             </>
           )}
         </button>
