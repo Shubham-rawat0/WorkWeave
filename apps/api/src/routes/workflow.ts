@@ -20,6 +20,23 @@ function toJson(value: unknown): Prisma.InputJsonValue {
     return value as Prisma.InputJsonValue;
 }
 
+function createExecutionStreamBootstrap(runId: string, userId: string) {
+    const token = signExecutionStreamToken(
+        {
+            runId,
+            userId,
+            ttlSeconds: EXECUTION_STREAM_TOKEN_TTL_SECONDS,
+        },
+        resolveExecutionStreamSigningSecret(),
+    );
+    const wsUrl = resolveExecutionStreamWsBaseUrlFromEnv();
+    return {
+        token,
+        expiresInSeconds: EXECUTION_STREAM_TOKEN_TTL_SECONDS,
+        ...(wsUrl ? { wsUrl } : {}),
+    };
+}
+
 async function assertAvailableActionsExist(
     actionIds: readonly string[],
 ): Promise<void> {
@@ -514,20 +531,7 @@ const app = new Hono<{ Variables: { user: User } }>()
             expiresInSeconds: number;
         }| undefined;
     try {
-        const token = signExecutionStreamToken(
-            {
-                runId: workflowRun.id,
-                userId: userId!,
-                ttlSeconds: EXECUTION_STREAM_TOKEN_TTL_SECONDS,
-            },
-            resolveExecutionStreamSigningSecret(),
-        );
-        const wsUrl = resolveExecutionStreamWsBaseUrlFromEnv();
-        stream = {
-            token,
-            expiresInSeconds: EXECUTION_STREAM_TOKEN_TTL_SECONDS,
-            ...(wsUrl ? { wsUrl } : {}),
-        };
+        stream = createExecutionStreamBootstrap(workflowRun.id, userId);
     } catch (error) {
         console.warn(
             "[workflow.execute] Failed to prepare execution stream bootstrap token.",
@@ -613,5 +617,29 @@ const app = new Hono<{ Variables: { user: User } }>()
         ...run,
         source: getRunSource(run.metadata),
     });
+})
+
+.get("/workflow/run/:id/stream", async (c) => {
+    const runId = c.req.param("id");
+    const userId = c.get("user").id;
+    const run = await prisma.workflowRun.findFirst({
+        where: {
+            id: runId,
+            workflow: { userId },
+        },
+        select: { id: true },
+    });
+    if (!run) {
+        throw new HTTPException(404, { message: "Execution not found" });
+    }
+
+    try {
+        return c.json({ stream: createExecutionStreamBootstrap(run.id, userId) });
+    } catch (error) {
+        console.error("[workflow.run.stream] Failed to prepare stream token.", error);
+        throw new HTTPException(503, {
+            message: "Execution event stream is unavailable.",
+        });
+    }
 });
 export default app

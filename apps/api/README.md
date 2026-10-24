@@ -36,3 +36,12 @@ and encrypted, and should be treated as credentials.
 
 Apply the `packages/db/prisma/migrations/20261022000000_webhook_endpoint`
 migration and regenerate the Prisma client after adding webhook endpoints.
+
+## Live workflow run events
+
+Set `EXECUTION_STREAM_SIGNING_SECRET` to the same secret used by the websocket
+service. Set `EXECUTION_WS_URL` to the externally reachable websocket base URL
+(for example, `wss://realtime.example.com`) when it differs from the web
+application host's default websocket port (`3101`). The API returns this URL
+with run stream credentials; the web app then connects to
+`/ws/executions`.
