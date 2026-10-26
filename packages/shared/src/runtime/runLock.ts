@@ -34,11 +34,14 @@ function getUserLockKey(userId:string):string{
 
 async function releaseLock(key:string,token:string):Promise<void>{
      await redis.eval(
-        `redis.call("get",KEYS[1])==ARGV[1] then
+        `if redis.call("get", KEYS[1]) == ARGV[1] then
             return redis.call("del",KEYS[1])
         else
             return 0
-        `,1,key,token
+        end`,
+        1,
+        key,
+        token,
     )
 }
 

@@ -193,8 +193,10 @@ model UsageRecord {
 
 enum WorkflowStatus {
   Pending
+  Running
   Success
   Failure
+  Cancelled
 }
 
 enum NodeStatus {

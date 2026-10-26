@@ -572,6 +572,25 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
     },lockHeartbeatIntervalMs)
 
     try {
+        const started = await prisma.workflowRun.updateMany({
+            where: {
+                id: workflowRunId,
+                status: { in: [WorkflowStatus.Pending, WorkflowStatus.Running] },
+            },
+            data: { status: WorkflowStatus.Running },
+        });
+        if (started.count === 0) {
+            return;
+        }
+        redis.publish(
+            `workflow-run:${workflowRunId}`,
+            JSON.stringify({
+                type: "workflow",
+                status: WorkflowStatus.Running.toString(),
+                timestamp: Date.now(),
+            }),
+        ).catch(() => { });
+
         const workflowRun = await prisma.workflowRun.findUnique({
             where: { id: workflowRunId },
             include: {

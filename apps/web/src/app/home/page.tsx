@@ -33,8 +33,16 @@ const STATUS_STYLES: Record<
     text: "text-red-400",
   },
   Pending: {
-    label: "Running",
+    label: "Queued",
     text: "text-amber-400",
+  },
+  Running: {
+    label: "Running",
+    text: "text-sky-400",
+  },
+  Cancelled: {
+    label: "Cancelled",
+    text: "text-zinc-400",
   },
 };
 
@@ -66,7 +74,11 @@ function StatusValue({ status }: { status: WorkflowStatus | null }) {
       ? "bg-emerald-400"
       : status === "Failure"
         ? "bg-red-400"
-        : "bg-amber-400";
+        : status === "Running"
+          ? "bg-sky-400"
+          : status === "Cancelled"
+            ? "bg-zinc-400"
+            : "bg-amber-400";
 
   return (
     <span

@@ -634,6 +634,55 @@ const app = new Hono<{ Variables: { user: User } }>()
     });
 })
 
+.post("/workflow/run/:id/cancel", async (c) => {
+    const runId = c.req.param("id");
+    const userId = c.get("user").id;
+    const result = await prisma.workflowRun.updateMany({
+        where: {
+            id: runId,
+            status: "Pending",
+            workflow: { userId },
+        },
+        data: {
+            status: "Cancelled",
+            finishedAt: new Date(),
+            errorMetadata: {
+                message: "Execution cancelled by user",
+            },
+        },
+    });
+
+    if (result.count === 0) {
+        const run = await prisma.workflowRun.findFirst({
+            where: { id: runId, workflow: { userId } },
+            select: { status: true },
+        });
+        if (!run) {
+            throw new HTTPException(404, { message: "Execution not found" });
+        }
+        throw new HTTPException(409, {
+            message: "Only pending executions can be cancelled.",
+        });
+    }
+
+    try {
+        const job = await getWorkflowQueue().getJob(runId);
+        if (job) {
+            const state = await job.getState();
+            if (state !== "active" && state !== "completed" && state !== "failed") {
+                await job.remove();
+            }
+        }
+    } catch (error) {
+        console.warn(
+            `[workflow.run.cancel] Could not remove queued job ${runId}; the worker will skip the cancelled run.`,
+            error,
+        );
+    }
+
+    return c.json({ runId, status: "Cancelled" as const });
+})
+
 .get("/workflow/run/:id/stream", async (c) => {
     const runId = c.req.param("id");
     const userId = c.get("user").id;

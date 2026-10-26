@@ -11,6 +11,8 @@ import {
 } from "../shared/formFields";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+const JSON_TEMPLATE_PLACEHOLDER =
+  /\{\{\s*(?:json\s+)?[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\s*\}\}/g;
 
 export function HTTPConfig({ data, onSave }: ConfigProps) {
   const [url, setUrl] = useState(data.url || "");
@@ -46,7 +48,15 @@ export function HTTPConfig({ data, onSave }: ConfigProps) {
       ) {
         throw new Error("Headers must be a JSON object.");
       }
-      parsedBody = body.trim() ? JSON.parse(body) : undefined;
+      if (body.trim()) {
+        const templatePlaceholders = body.match(JSON_TEMPLATE_PLACEHOLDER);
+        if (templatePlaceholders?.length) {
+          JSON.parse(body.replace(JSON_TEMPLATE_PLACEHOLDER, "null"));
+          parsedBody = body;
+        } else {
+          parsedBody = JSON.parse(body);
+        }
+      }
     } catch (error) {
       setParseError(
         error instanceof Error ? error.message : "Invalid JSON in request data.",

@@ -11,6 +11,9 @@ type SupportedAINodeType =
 type AIProvider = "openai" | "anthropic" | "gemini";
 type AIInputMode = "prompt" | "json";
 const MAX_PROMPT_CHARS = 200_000;
+const AI_REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+const UNAVAILABLE_GEMINI_MODEL = "gemini-2.5-flash";
 const PROMPT_TRUNCATION_SUFFIX =
     "\n\n[Prompt truncated to stay within model context limits]";
 const AI_PROVIDER_BY_NODE_TYPE: Record<SupportedAINodeType, AIProvider> = {
@@ -22,7 +25,7 @@ const AI_PROVIDER_BY_NODE_TYPE: Record<SupportedAINodeType, AIProvider> = {
 const DEFAULT_MODEL_BY_PROVIDER: Record<AIProvider, string> = {
     openai: "gpt-5-mini",
     anthropic: "claude-sonnet-4-5",
-    gemini: "gemini-2.5-flash",
+    gemini: DEFAULT_GEMINI_MODEL,
 };
 
 function resolveInputMode(inputMode: unknown): AIInputMode {
@@ -378,6 +381,7 @@ async function executeGeminiRequest(params: {
     };
     const response = await fetch(endpoint, {
         method: "POST",
+        signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
         headers: {
             "Content-Type": "application/json",
         },
@@ -579,6 +583,7 @@ async function executeGeminiJsonRequest(params: {
     }
     const response = await fetch(endpoint, {
         method: "POST",
+        signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
         headers: {
             "Content-Type": "application/json",
         },
@@ -660,7 +665,10 @@ export async function executeAINode(
     }
     
     const parsedSystemPrompt=systemPrompt?parseTemplate(systemPrompt,runMetadata):undefined
-    const resolvedModel = trimmedModel || DEFAULT_MODEL_BY_PROVIDER[provider];
+    const resolvedModel =
+        provider === "gemini" && trimmedModel === UNAVAILABLE_GEMINI_MODEL
+            ? DEFAULT_GEMINI_MODEL
+            : trimmedModel || DEFAULT_MODEL_BY_PROVIDER[provider];
 
     if (inputMode==="json"){
         const trimmedRequestJson = requestJson?.trim();

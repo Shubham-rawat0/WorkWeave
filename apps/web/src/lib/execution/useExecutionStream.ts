@@ -35,7 +35,9 @@ export function useExecutionStream(
       initialEvents.some(
         (event) =>
           event.type === "workflow" &&
-          (event.status === "Success" || event.status === "Failure"),
+          (event.status === "Success" ||
+            event.status === "Failure" ||
+            event.status === "Cancelled"),
       )
     ) {
       setState("finished");
@@ -121,7 +123,11 @@ export function useExecutionStream(
           ].slice(-500);
         });
         setConnectionMessage(null);
-        if (run.status === "Success" || run.status === "Failure") {
+        if (
+          run.status === "Success" ||
+          run.status === "Failure" ||
+          run.status === "Cancelled"
+        ) {
           setState("finished");
           window.clearInterval(pollTimer);
           disconnect();

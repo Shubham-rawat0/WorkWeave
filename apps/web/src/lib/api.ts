@@ -39,7 +39,7 @@ export type SessionInfo = InferResponseType<
 
 export type WorkflowRunSummary = {
     id: string;
-    status: "Pending" | "Success" | "Failure";
+    status: "Pending" | "Running" | "Success" | "Failure" | "Cancelled";
     createdAt: string;
     finishedAt: string | null;
     metadata?: unknown;
@@ -69,7 +69,7 @@ export type WorkflowUsage = InferResponseType<
 
 type WorkflowRunsQuery = {
     workflowId: string;
-    status?: "Pending" | "Success" | "Failure";
+    status?: "Pending" | "Running" | "Success" | "Failure" | "Cancelled";
     limit?: number;
     cursor?: string;
 };
@@ -180,6 +180,12 @@ export const api = {
     workflowRun: (id: string) =>
         unwrap(
             client.api.v1.workflow.workflow.run[":id"].$get({
+                param: { id },
+            }),
+        ),
+    cancelWorkflowRun: (id: string) =>
+        unwrap(
+            client.api.v1.workflow.workflow.run[":id"].cancel.$post({
                 param: { id },
             }),
         ),

@@ -108,7 +108,9 @@ export function connectExecutionStream({
         onEvent(event);
         if (
           event.type === "workflow" &&
-          (event.status === "Success" || event.status === "Failure")
+          (event.status === "Success" ||
+            event.status === "Failure" ||
+            event.status === "Cancelled")
         ) {
           finished = true;
           if (stableConnectionTimer) clearTimeout(stableConnectionTimer);

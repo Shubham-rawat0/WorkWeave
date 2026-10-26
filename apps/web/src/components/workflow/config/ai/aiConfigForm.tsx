@@ -31,7 +31,7 @@ const PROVIDER_CONFIG: Record<
     name: "Gemini",
     models: [
       { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-      { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+      { value: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
       { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
     ],
   },
@@ -75,7 +75,11 @@ export function AIConfigForm({
     data.responseName || `${provider}Response`,
   );
   const [credentialId, setCredentialId] = useState(data.credentialId || "");
-  const [model, setModel] = useState(data.model || "");
+  const [model, setModel] = useState(
+    provider === "gemini" && data.model === "gemini-2.5-flash"
+      ? "gemini-3.8-flash"
+      : data.model || "",
+  );
   const [systemPrompt, setSystemPrompt] = useState(data.systemPrompt || "");
   const [inputMode, setInputMode] = useState<"prompt" | "json">(
     data.inputMode === "json" ? "json" : "prompt",

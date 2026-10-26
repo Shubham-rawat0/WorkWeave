@@ -1,4 +1,7 @@
-import { parseTemplate } from "@WorkOrchestrator/shared/parser";
+import {
+    parseTemplate,
+    parseTemplateWithMetadata,
+} from "@WorkOrchestrator/shared/parser";
 import { HTTPNodeData, NodeExecutionOutput } from "../../engine/types";
 import { ssrfError, validateOutboundUrl } from "@WorkOrchestrator/shared/ssrf";
 const MAX_TEXT_RESPONSE_CHARS = 100_000;
@@ -120,7 +123,26 @@ export async function executeHTTPNode(
 
     let parsedBody
     if (body && typeof body==="string"){
-        parsedBody=parseTemplate(body,runMetadata as Record<string,string>)
+        const parsedTemplate = parseTemplateWithMetadata(
+            body,
+            runMetadata as Record<string, string>,
+        );
+        if (parsedTemplate.missingVars?.length) {
+            throw new Error(
+                `HTTP request body uses undefined variables: ${parsedTemplate.missingVars.join(", ")}`,
+            );
+        }
+        if (parsedTemplate.hasSubstitutions) {
+            try {
+                parsedBody = JSON.parse(parsedTemplate.output);
+            } catch {
+                throw new Error(
+                    "HTTP request body template rendered to invalid JSON.",
+                );
+            }
+        } else {
+            parsedBody = body;
+        }
     }
     else{
         parsedBody=body

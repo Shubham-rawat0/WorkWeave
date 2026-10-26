@@ -64,7 +64,7 @@ export const executeWorkflowInputSchema = z.object({
 
 export const workflowRunsInputSchema =z.object({
     workflowId: z.string(),
-    status: z.enum(["Pending", "Success", "Failure"]).optional(),
+    status: z.enum(["Pending", "Running", "Success", "Failure", "Cancelled"]).optional(),
     limit: z.coerce.number().min(1).max(50).default(20),
     cursor: z.string().optional(),
 });

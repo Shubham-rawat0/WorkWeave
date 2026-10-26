@@ -191,6 +191,7 @@ function HistoricalRunFeed({ run }: { run: WorkflowRunSummary }) {
           events={events}
           state={
             run.status === "Success" || run.status === "Failure"
+              || run.status === "Cancelled"
               ? "finished"
               : "idle"
           }
@@ -249,7 +250,7 @@ export default function WorkflowPage() {
   const activeRunInitialEvents = useMemo<
     ExecutionStreamEvent[] | undefined
   >(() => {
-    if (!activeRun || activeRun.status === "Pending") return undefined;
+    if (!activeRun || activeRun.status === "Pending" || activeRun.status === "Running") return undefined;
     return getRunEvents(activeRun);
   }, [activeRun]);
   const executionStream = useExecutionStream(
@@ -269,7 +270,9 @@ export default function WorkflowPage() {
   const activeRunIsLive =
     Boolean(activeRunId) &&
     executionStream.state !== "finished" &&
-    (activeRunStatus === null || activeRunStatus === "Pending");
+    (activeRunStatus === null ||
+      activeRunStatus === "Pending" ||
+      activeRunStatus === "Running");
 
   usePageTitle(
     loadError ? "Workflow unavailable" : (workflowName ?? "Loading…"),

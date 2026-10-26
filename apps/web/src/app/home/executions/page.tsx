@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Square } from "lucide-react";
 import { getNodeDef } from "@WorkOrchestrator/shared/nodeRegistry";
 import {
   api,
@@ -15,12 +15,21 @@ import { cn } from "@/lib/utils";
 
 type ExecutionTab = "All" | WorkflowRunSummary["status"];
 
-const TABS: ExecutionTab[] = ["All", "Pending", "Success", "Failure"];
+const TABS: ExecutionTab[] = [
+  "All",
+  "Pending",
+  "Running",
+  "Success",
+  "Failure",
+  "Cancelled",
+];
 
 const STATUS_LABELS: Record<WorkflowRunSummary["status"], string> = {
-  Pending: "Pending",
+  Pending: "Queued",
+  Running: "Running",
   Success: "Success",
   Failure: "Failure",
+  Cancelled: "Cancelled",
 };
 
 const NODE_STATUS_DOT: Record<string, string> = {
@@ -245,10 +254,14 @@ function RunRow({
   run,
   expanded,
   onToggle,
+  onCancel,
+  isCancelling,
 }: {
   run: WorkflowRunSummary;
   expanded: boolean;
   onToggle: () => void;
+  onCancel: () => void;
+  isCancelling: boolean;
 }) {
   const failedNodes = run.nodeRuns.filter(
     (nodeRun) => nodeRun.status === "Failed",
@@ -267,46 +280,62 @@ function RunRow({
           className="absolute inset-y-0 left-0 w-px bg-[#F04D26]"
         />
       )}
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="group flex w-full items-center justify-between gap-4 px-3 py-3 text-left"
-      >
-        <span className="min-w-0">
-          <span className="block truncate font-mono text-xs text-[#d1d0ca]">
-            Run {run.id.slice(0, 8)}
+      <div className="flex items-center gap-2 pr-3">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="group flex min-w-0 flex-1 items-center justify-between gap-4 py-3 pl-3 text-left"
+        >
+          <span className="min-w-0">
+            <span className="block truncate font-mono text-xs text-[#d1d0ca]">
+              Run {run.id.slice(0, 8)}
+            </span>
+            <span className="mt-1 block text-[11px] text-[#6f6d66]">
+              {formatDateTime(run.createdAt)}
+              <span aria-hidden="true"> · </span>
+              {run.status === "Pending"
+                ? `Queued for ${formatDuration(run.createdAt, run.finishedAt)}`
+                : run.status === "Running"
+                  ? `Running for ${formatDuration(run.createdAt, run.finishedAt)}`
+                  : formatDuration(run.createdAt, run.finishedAt)}
+              <span aria-hidden="true"> · </span>
+              {run.nodeRuns.length} nodes
+              {failedNodes > 0 && (
+                <>
+                  <span aria-hidden="true"> · </span>
+                  {failedNodes} failed
+                </>
+              )}
+            </span>
           </span>
-          <span className="mt-1 block text-[11px] text-[#6f6d66]">
-            {formatDateTime(run.createdAt)}
-            <span aria-hidden="true"> · </span>
-            {run.status === "Pending"
-              ? `Running for ${formatDuration(run.createdAt, run.finishedAt)}`
-              : formatDuration(run.createdAt, run.finishedAt)}
-            <span aria-hidden="true"> · </span>
-            {run.nodeRuns.length} nodes
-            {failedNodes > 0 && (
-              <>
-                <span aria-hidden="true"> · </span>
-                {failedNodes} failed
-              </>
-            )}
-          </span>
-        </span>
 
-        <span className="flex shrink-0 items-center gap-3">
-          <span className="text-[10px] uppercase tracking-[0.14em] text-[#6f6d66]">
-            {STATUS_LABELS[run.status]}
+          <span className="flex shrink-0 items-center gap-3">
+            <span className="text-[10px] uppercase tracking-[0.14em] text-[#6f6d66]">
+              {STATUS_LABELS[run.status]}
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                "size-3.5 transition-transform group-hover:text-[#b0aea6]",
+                expanded ? "rotate-180 text-[#F04D26]" : "text-[#555550]",
+              )}
+            />
           </span>
-          <ChevronDown
-            aria-hidden="true"
-            className={cn(
-              "size-3.5 transition-transform group-hover:text-[#b0aea6]",
-              expanded ? "rotate-180 text-[#F04D26]" : "text-[#555550]",
-            )}
-          />
-        </span>
-      </button>
+        </button>
+        {run.status === "Pending" && (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isCancelling}
+            aria-label={`Cancel run ${run.id.slice(0, 8)}`}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-white/10 px-2 text-[11px] text-[#b0aea6] transition-colors hover:border-red-400/40 hover:text-red-300 disabled:cursor-wait disabled:opacity-50"
+          >
+            <Square aria-hidden="true" className="size-3" />
+            {isCancelling ? "Cancelling…" : "Cancel"}
+          </button>
+        )}
+      </div>
 
       {expanded && (
         <div className="space-y-4 px-3 pb-4">
@@ -335,6 +364,8 @@ export default function ExecutionsPage() {
   const [runs, setRuns] = useState<WorkflowRunSummary[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
   const [runsError, setRunsError] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancellingRunId, setCancellingRunId] = useState<string | null>(null);
   const [runsRefreshKey, setRunsRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<ExecutionTab>("All");
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
@@ -449,8 +480,10 @@ export default function ExecutionsPage() {
     const result: Record<ExecutionTab, number> = {
       All: runs.length,
       Pending: 0,
+      Running: 0,
       Success: 0,
       Failure: 0,
+      Cancelled: 0,
     };
     for (const run of runs) {
       result[run.status] += 1;
@@ -466,13 +499,29 @@ export default function ExecutionsPage() {
     [activeTab, runs],
   );
 
+  async function handleCancelRun(runId: string) {
+    setCancellingRunId(runId);
+    setCancelError(null);
+    try {
+      await api.cancelWorkflowRun(runId);
+      setRunsRefreshKey((current) => current + 1);
+      setWorkflowsRefreshKey((current) => current + 1);
+    } catch (error) {
+      setCancelError(
+        error instanceof Error ? error.message : "Failed to cancel execution.",
+      );
+    } finally {
+      setCancellingRunId(null);
+    }
+  }
+
   useEffect(() => {
-    if (counts.Pending === 0) return;
+    if (counts.Pending === 0 && counts.Running === 0) return;
     const timer = window.setInterval(() => {
       setRunsRefreshKey((current) => current + 1);
     }, 5_000);
     return () => window.clearInterval(timer);
-  }, [counts.Pending]);
+  }, [counts.Pending, counts.Running]);
 
   return (
     <div className="flex h-[calc(100svh-4rem)] min-h-0 w-full flex-col px-4 pb-4 md:px-6">
@@ -567,6 +616,11 @@ export default function ExecutionsPage() {
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6">
+                {cancelError && (
+                  <p role="alert" className="mt-3 text-xs text-red-300">
+                    {cancelError}
+                  </p>
+                )}
                 {runsError ? (
                   <div className="mt-4 rounded-md border border-white/10 px-3 py-3">
                     <p className="text-xs text-[#b0aea6]">{runsError}</p>
@@ -602,6 +656,8 @@ export default function ExecutionsPage() {
                         key={run.id}
                         run={run}
                         expanded={expandedRunId === run.id}
+                        onCancel={() => void handleCancelRun(run.id)}
+                        isCancelling={cancellingRunId === run.id}
                         onToggle={() =>
                           setExpandedRunId((current) =>
                             current === run.id ? null : run.id,
