@@ -138,6 +138,17 @@ export const NODE_REGISTRY: NodeDefinition[] = [
         },
     },
     {
+        type: "telegramNode",
+        label: "Telegram",
+        description: "Send a message to any Telegram chat using a bot",
+        category: "integrations",
+        isTrigger: false,
+        MetaData: {
+            title: "Telegram Configuration",
+            subtitle: "Configure the bot, chat, and message",
+        },
+    },
+    {
         type: "conditionNode",
         label: "Condition",
         description: "Branch workflow based on expression rules",

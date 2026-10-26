@@ -12,6 +12,7 @@ export const nodeTypes = {
   geminiNode: WorkflowTypeNode,
   anthropicNode: WorkflowTypeNode,
   slackNode: WorkflowTypeNode,
+  telegramNode: WorkflowTypeNode,
   discordNode: WorkflowTypeNode,
   conditionNode: WorkflowTypeNode,
   filterNode: WorkflowTypeNode,

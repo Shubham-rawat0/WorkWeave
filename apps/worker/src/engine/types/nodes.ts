@@ -18,9 +18,9 @@ export interface SlackNodeData {
     credentialId?: string;
 }
 export interface TelegramNodeData {
-    botToken: string;
-    chatId: string;
-    message: string;
+    credentialId?: string;
+    chatId?: string;
+    message?: string;
 }
 export interface HTTPNodeData {
     url?: string;
@@ -127,7 +127,7 @@ export type WorkflowNode =
     }
     | {
         id: string;
-        type: "telegram";
+        type: "telegramNode";
         data: TelegramNodeData;
         position?: Position;
     }

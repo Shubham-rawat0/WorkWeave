@@ -489,6 +489,17 @@ export function checkMissingConfigurations(
           );
         }
         break;
+      case "telegramNode":
+        if (!data.credentialId?.trim()) {
+          pushIssue(`${label}: Missing Telegram bot credential`, "Select a Telegram bot credential");
+        }
+        if (!data.chatId?.trim()) {
+          pushIssue(`${label}: Missing chat ID`, "Enter the user, group, or channel chat ID");
+        }
+        if (!data.message?.trim()) {
+          pushIssue(`${label}: Missing message`, "Configure the message content");
+        }
+        break;
     }
   }
   return issues;

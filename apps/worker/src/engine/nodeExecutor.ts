@@ -1,6 +1,6 @@
 import { getMainRedisClient } from "@WorkOrchestrator/shared/redis";
 import { NodeExecutionOutput, NodeRun, WorkflowEdge, WorkflowNode } from "./types";
-import { executeAINode, executeConditionNode, executeCronTrigger, executeDelayNode, executeFilterNode, executeGitHubNode, executeHTTPNode, executeLogNode, executeNotionNode, executeSlackNode, executeTransformNode, executeWebhookTriggerNode } from "../executor";
+import { executeAINode, executeConditionNode, executeCronTrigger, executeDelayNode, executeFilterNode, executeGitHubNode, executeHTTPNode, executeLogNode, executeNotionNode, executeSlackNode, executeTelegramNode, executeTransformNode, executeWebhookTriggerNode } from "../executor";
 import { NodeStatus, prisma } from "@WorkOrchestrator/prisma";
 
 // Max bytes of a node output sent over SSE before it is truncated.
@@ -19,6 +19,7 @@ const SOFT_FAILURE_NODE_TYPES = new Set([
     "anthropicNode",
     "geminiNode",
     "slackNode",
+    "telegramNode",
     "transformNode",
 ]);
 
@@ -188,6 +189,8 @@ async function executNodeLogic(
                 runMetadata,
                 ownerUserId,
             );
+        case "telegramNode":
+            return await executeTelegramNode(node.data, runMetadata, ownerUserId);
         case "webhookTrigger":
             return await executeWebhookTriggerNode(nodeRunId);
         case "cronTrigger":
@@ -220,7 +223,7 @@ async function executNodeLogic(
                 ownerUserId,
             );
         default:
-            throw new Error(`Unsupported node type: ${node.type}`);
+            throw new Error("Unsupported node type");
     }
 }
 

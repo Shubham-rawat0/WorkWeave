@@ -22,6 +22,7 @@ import {
   NotionConfig,
   OpenAIConfig,
   SlackConfig,
+  TelegramConfig,
   TransformConfig,
   TriggerConfig,
   WebhookTriggerConfig,
@@ -88,6 +89,8 @@ export function NodeConfigDialog({
         return <AnthropicConfig data={nodeData} onSave={handleSave} />;
       case "slackNode":
         return <SlackConfig data={nodeData} onSave={handleSave} />;
+      case "telegramNode":
+        return <TelegramConfig data={nodeData} onSave={handleSave} />;
       case "httpTrigger":
         return <HTTPConfig data={nodeData} onSave={handleSave} />;
       case "githubNode":

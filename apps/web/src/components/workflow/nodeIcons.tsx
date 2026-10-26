@@ -49,6 +49,10 @@ export function getNodeIcon(type: string, size = 16): ReactNode {
           style={{ width: size, height: size }}
         />
       );
+    case "telegramNode":
+      return (
+        <img src="/logo/telegram.svg" alt="" width={size} height={size} style={{ width: size, height: size }} />
+      );
     case "discordNode":
       return <MessageSquare size={size} className="text-indigo-400" />;
     case "conditionNode":

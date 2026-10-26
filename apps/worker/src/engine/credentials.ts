@@ -13,7 +13,8 @@ export type CredentialPlatform =
     | "gemini"
     | "github"
     | "notion"
-    | "slack";
+    | "slack"
+    | "telegram";
 
 export async function resolveCredentials(credentialId:string,userId:string):Promise<ResolvedCredential>{
     const cred=await prisma.credentials.findFirst({

@@ -12,6 +12,7 @@ export { NotionConfig } from "./integrations/notion";
 export { NotionConfig as NotionNode } from "./integrations/notion";
 export { SlackConfig } from "./integrations/slack";
 export { SlackConfig as SlackNode } from "./integrations/slack";
+export { TelegramConfig } from "./integrations/telegram";
 export { ConditionConfig } from "./logic/condition";
 export { ConditionConfig as ConditionNode } from "./logic/condition";
 export { FilterConfig } from "./logic/filter";

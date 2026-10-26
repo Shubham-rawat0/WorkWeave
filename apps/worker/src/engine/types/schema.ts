@@ -72,10 +72,10 @@ const slackNodeDataSchema = z
     })
     .loose();
 const telegramNodeDataSchema = z.object({
-    botToken: z.string(),
-    chatId: z.string(),
-    message: z.string(),
-});
+    credentialId: z.string().optional(),
+    chatId: z.string().optional(),
+    message: z.string().optional(),
+}).loose();
 const httpNodeDataSchema = z
     .object({
         url: optionalUrlField,
@@ -167,7 +167,7 @@ const knownWorkflowNodeSchema = z.discriminatedUnion("type", [
     z
         .object({
             id: z.string(),
-            type: z.literal("telegram"),
+            type: z.literal("telegramNode"),
             data: telegramNodeDataSchema,
             position: positionSchema.optional(),
         })
@@ -303,7 +303,7 @@ const knownWorkflowNodeSchema = z.discriminatedUnion("type", [
 ]);
 
 const knownWorkflowNodeTypes = new Set([
-    "slackNode", "telegram", "httpTrigger", "githubNode", "notionNode",
+    "slackNode", "telegramNode", "httpTrigger", "githubNode", "notionNode",
     "aiNode", "openaiNode", "geminiNode", "anthropicNode", "triggerNode",
     "manualTrigger", "webhookTrigger", "cronTrigger", "conditionNode",
     "delayNode", "logNode", "transformNode", "filterNode",
