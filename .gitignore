@@ -58,3 +58,5 @@ yarn-error.log*
 
 # Generated Prisma client
 packages/db/generated/
+
+test

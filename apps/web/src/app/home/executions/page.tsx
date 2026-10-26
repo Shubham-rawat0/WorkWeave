@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Square } from "lucide-react";
+import {
+  ChevronDown,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Square,
+} from "lucide-react";
 import { getNodeDef } from "@WorkOrchestrator/shared/nodeRegistry";
 import {
   api,
@@ -102,8 +108,8 @@ function hasPayload(value: unknown): boolean {
 
 function PayloadBlock({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className="overflow-hidden rounded-md border border-white/[0.07] bg-black/25">
-      <div className="border-b border-white/[0.05] px-2.5 py-1.5">
+    <div className="overflow-hidden rounded-md border border-white/[0.07] bg-[#181818]">
+      <div className="border-b border-white/[0.05] bg-[#202020] px-2.5 py-1.5">
         <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#6f6d66]">
           {label}
         </span>
@@ -270,55 +276,69 @@ function RunRow({
   return (
     <li
       className={cn(
-        "relative border-b border-white/[0.06] transition-colors",
-        expanded && "border-white/[0.1]",
+        "relative overflow-hidden rounded-xl border bg-[#151515] transition-colors",
+        expanded
+          ? "border-[#F04D26]/35 bg-[#181818] shadow-[0_8px_30px_rgba(0,0,0,0.2)]"
+          : "border-white/[0.07] hover:border-white/[0.14] hover:bg-[#191919]",
       )}
     >
       {expanded && (
         <span
           aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-px bg-[#F04D26]"
+          className="absolute inset-y-0 left-0 w-0.5 bg-[#F04D26]"
         />
       )}
-      <div className="flex items-center gap-2 pr-3">
+      <div className="flex items-center gap-2 px-2">
         <button
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="group flex min-w-0 flex-1 items-center justify-between gap-4 py-3 pl-3 text-left"
+          className="group flex min-w-0 flex-1 items-center gap-3 py-3 pl-2 text-left"
         >
           <span className="min-w-0">
             <span className="block truncate font-mono text-xs text-[#d1d0ca]">
               Run {run.id.slice(0, 8)}
             </span>
-            <span className="mt-1 block text-[11px] text-[#6f6d66]">
-              {formatDateTime(run.createdAt)}
-              <span aria-hidden="true"> · </span>
-              {run.status === "Pending"
-                ? `Queued for ${formatDuration(run.createdAt, run.finishedAt)}`
-                : run.status === "Running"
-                  ? `Running for ${formatDuration(run.createdAt, run.finishedAt)}`
-                  : formatDuration(run.createdAt, run.finishedAt)}
-              <span aria-hidden="true"> · </span>
-              {run.nodeRuns.length} nodes
+            <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-[#77766f]">
+              <span>{formatDateTime(run.createdAt)}</span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {run.status === "Pending"
+                  ? `Queued ${formatDuration(run.createdAt, run.finishedAt)}`
+                  : run.status === "Running"
+                    ? `Running ${formatDuration(run.createdAt, run.finishedAt)}`
+                    : formatDuration(run.createdAt, run.finishedAt)}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>{run.nodeRuns.length} nodes</span>
               {failedNodes > 0 && (
-                <>
-                  <span aria-hidden="true"> · </span>
-                  {failedNodes} failed
-                </>
+                <span className="text-red-300/80">{failedNodes} failed</span>
               )}
             </span>
           </span>
 
-          <span className="flex shrink-0 items-center gap-3">
-            <span className="text-[10px] uppercase tracking-[0.14em] text-[#6f6d66]">
+          <span className="ml-auto flex shrink-0 items-center gap-2">
+            <span
+              className={cn(
+                "text-[9px] font-semibold uppercase tracking-[0.11em]",
+                run.status === "Success"
+                  ? "text-emerald-300"
+                  : run.status === "Failure"
+                    ? "text-red-300"
+                    : run.status === "Running"
+                      ? "text-sky-300"
+                      : run.status === "Cancelled"
+                        ? "text-[#9b9991]"
+                        : "text-amber-200",
+              )}
+            >
               {STATUS_LABELS[run.status]}
             </span>
             <ChevronDown
               aria-hidden="true"
               className={cn(
-                "size-3.5 transition-transform group-hover:text-[#b0aea6]",
-                expanded ? "rotate-180 text-[#F04D26]" : "text-[#555550]",
+                "size-4 transition-transform group-hover:text-[#d1d0ca]",
+                expanded ? "rotate-180 text-[#F04D26]" : "text-[#6f6d66]",
               )}
             />
           </span>
@@ -329,7 +349,7 @@ function RunRow({
             onClick={onCancel}
             disabled={isCancelling}
             aria-label={`Cancel run ${run.id.slice(0, 8)}`}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-white/10 px-2 text-[11px] text-[#b0aea6] transition-colors hover:border-red-400/40 hover:text-red-300 disabled:cursor-wait disabled:opacity-50"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-white/10 px-2 text-[11px] text-[#b0aea6] transition-colors hover:border-red-400/40 hover:bg-red-400/[0.06] hover:text-red-300 disabled:cursor-wait disabled:opacity-50"
           >
             <Square aria-hidden="true" className="size-3" />
             {isCancelling ? "Cancelling…" : "Cancel"}
@@ -338,7 +358,7 @@ function RunRow({
       </div>
 
       {expanded && (
-        <div className="space-y-4 px-3 pb-4">
+        <div className="space-y-4 border-t border-white/[0.07] bg-[#111111] px-4 pb-4 pt-3">
           {hasPayload(run.metadata) && (
             <PayloadBlock label="Run payload" value={run.metadata} />
           )}
@@ -515,14 +535,6 @@ export default function ExecutionsPage() {
     }
   }
 
-  useEffect(() => {
-    if (counts.Pending === 0 && counts.Running === 0) return;
-    const timer = window.setInterval(() => {
-      setRunsRefreshKey((current) => current + 1);
-    }, 5_000);
-    return () => window.clearInterval(timer);
-  }, [counts.Pending, counts.Running]);
-
   return (
     <div className="flex h-[calc(100svh-4rem)] min-h-0 w-full flex-col px-4 pb-4 md:px-6">
       <header className="shrink-0 py-5">
@@ -586,36 +598,101 @@ export default function ExecutionsPage() {
           </div>
         </aside>
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-[#191919]">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/[0.06] bg-[#191919] shadow-[0_16px_50px_rgba(0,0,0,0.16)]">
           {selectedWorkflow ? (
             <>
-              <div className="flex shrink-0 items-center gap-5 overflow-x-auto border-b border-white/10 px-4 md:px-6">
-                {TABS.map((tab) => {
-                  const isActive = activeTab === tab;
-                  return (
+              <div className="shrink-0 border-b border-white/[0.07] bg-gradient-to-br from-[#20201f] via-[#1b1b1b] to-[#191919] px-4 py-5 md:px-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-lg font-semibold tracking-tight text-white">
+                        {selectedWorkflow.title}
+                      </h2>
+                      <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-[#77766f]">
+                        <span
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            counts.Pending + counts.Running > 0
+                              ? "animate-pulse bg-sky-400"
+                              : "bg-[#555550]",
+                          )}
+                        />
+                        <span>
+                          {counts.Pending + counts.Running}{" "}
+                          {counts.Pending + counts.Running === 1
+                            ? "execution active"
+                            : "executions active"}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
                     <button
-                      key={tab}
                       type="button"
-                      role="tab"
-                      aria-selected={isActive}
-                      onClick={() => setActiveTab(tab)}
-                      className={cn(
-                        "-mb-px inline-flex h-10 shrink-0 items-center gap-1.5 border-b text-xs transition-colors",
-                        isActive
-                          ? "border-[#F04D26] text-white"
-                          : "border-transparent text-[#6f6d66] hover:text-[#b0aea6]",
-                      )}
+                      onClick={() =>
+                        setRunsRefreshKey((current) => current + 1)
+                      }
+                      disabled={runsLoading}
+                      aria-label="Refresh executions"
+                      title="Refresh executions"
+                      className="flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-[#99978f] transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white disabled:cursor-wait disabled:opacity-50"
                     >
-                      {tab}
-                      <span className="text-[10px] tabular-nums text-[#555550]">
-                        {counts[tab]}
-                      </span>
+                      <RefreshCw
+                        className={cn("size-4", runsLoading && "animate-spin")}
+                      />
                     </button>
-                  );
-                })}
+                    <Link
+                      href={`/home/${selectedWorkflow.id}`}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#F04D26] px-3 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(240,77,38,0.16)] transition-colors hover:bg-[#ff6039]"
+                    >
+                      Open workflow
+                      <ExternalLink className="size-3.5" />
+                    </Link>
+                  </div>
+                </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3 md:px-6">
+                <div
+                  role="tablist"
+                  aria-label="Filter executions by status"
+                  className="flex min-w-0 items-center gap-1 overflow-x-auto"
+                >
+                  {TABS.map((tab) => {
+                    const isActive = activeTab === tab;
+                    return (
+                      <button
+                        key={tab}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        onClick={() => setActiveTab(tab)}
+                        className={cn(
+                          "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium transition-colors",
+                          isActive
+                            ? "bg-white/[0.09] text-white"
+                            : "text-[#77766f] hover:bg-white/[0.04] hover:text-[#d1d0ca]",
+                        )}
+                      >
+                        {tab}
+                        <span
+                          className={cn(
+                            "text-[10px] tabular-nums",
+                            isActive ? "text-[#d1d0ca]" : "text-[#555550]",
+                          )}
+                        >
+                          {counts[tab]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="hidden shrink-0 text-[10px] text-[#5f5e58] sm:inline">
+                  Newest first
+                </span>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
                 {cancelError && (
                   <p role="alert" className="mt-3 text-xs text-red-300">
                     {cancelError}
@@ -650,7 +727,7 @@ export default function ExecutionsPage() {
                     </p>
                   </div>
                 ) : (
-                  <ul>
+                  <ul className="space-y-2">
                     {visibleRuns.map((run) => (
                       <RunRow
                         key={run.id}
