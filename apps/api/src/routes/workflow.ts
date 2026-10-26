@@ -153,6 +153,21 @@ const app = new Hono<{ Variables: { user: User } }>()
     return c.json({ workflowRuns: hydratedworkflowRuns, nextCursor });
 })
 
+.get("/usage", async (c) => {
+    const userId = c.get("user").id;
+    const now = new Date();
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const usage = await prisma.usageRecord.findUnique({
+        where: { userId_month: { userId, month } },
+        select: { runCount: true },
+    });
+    return c.json({
+        month,
+        runCount: usage?.runCount ?? 0,
+        limit: 1000,
+    });
+})
+
 .get("/:id",async (c)=>{
     const id=c.req.param("id")
     const userId=c.get("user").id

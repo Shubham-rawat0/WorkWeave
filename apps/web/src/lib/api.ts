@@ -42,6 +42,8 @@ export type WorkflowRunSummary = {
     status: "Pending" | "Success" | "Failure";
     createdAt: string;
     finishedAt: string | null;
+    metadata?: unknown;
+    errorMetadata?: unknown;
     workflow: { id: string; title: string };
     nodeRuns: Array<{
         id: string;
@@ -51,6 +53,7 @@ export type WorkflowRunSummary = {
         startedAt: string;
         completedAt: string | null;
         error: string | null;
+        input?: unknown;
         output: unknown;
     }>;
 };
@@ -59,6 +62,10 @@ export type WorkflowRunsResponse = {
     workflowRuns: WorkflowRunSummary[];
     nextCursor?: string;
 };
+
+export type WorkflowUsage = InferResponseType<
+    typeof client.api.v1.workflow.usage.$get
+>;
 
 type WorkflowRunsQuery = {
     workflowId: string;
@@ -182,6 +189,7 @@ export const api = {
         }) => Promise<ClientResponse<WorkflowRunsResponse, 200, "json">>;
         return unwrap(getWorkflowRuns({ query }));
     },
+    workflowUsage: () => unwrap(client.api.v1.workflow.usage.$get()),
     executionStream: (id: string) =>
         unwrap(
             client.api.v1.workflow.workflow.run[":id"].stream.$get({

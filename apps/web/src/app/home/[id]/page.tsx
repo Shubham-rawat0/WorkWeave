@@ -156,24 +156,28 @@ type ExecutionStreamEvent = {
   [key: string]: unknown;
 };
 
+function getRunEvents(run: WorkflowRunSummary): ExecutionStreamEvent[] {
+  return [
+    {
+      type: "workflow",
+      status: run.status,
+      timestamp: new Date(run.finishedAt ?? run.createdAt).getTime(),
+    },
+    ...run.nodeRuns.map((nodeRun) => ({
+      type: "node",
+      nodeId: nodeRun.nodeId,
+      nodeType: nodeRun.nodeType,
+      status: nodeRun.status,
+      timestamp: new Date(nodeRun.completedAt ?? nodeRun.startedAt).getTime(),
+      ...(nodeRun.error ? { error: nodeRun.error } : {}),
+      ...(nodeRun.output !== null ? { output: nodeRun.output } : {}),
+    })),
+  ];
+}
+
 function HistoricalRunFeed({ run }: { run: WorkflowRunSummary }) {
   const events = useMemo<ExecutionStreamEvent[]>(
-    () => [
-      {
-        type: "workflow",
-        status: run.status,
-        timestamp: new Date(run.finishedAt ?? run.createdAt).getTime(),
-      },
-      ...run.nodeRuns.map((nodeRun) => ({
-        type: "node",
-        nodeId: nodeRun.nodeId,
-        nodeType: nodeRun.nodeType,
-        status: nodeRun.status,
-        timestamp: new Date(nodeRun.completedAt ?? nodeRun.startedAt).getTime(),
-        ...(nodeRun.error ? { error: nodeRun.error } : {}),
-        ...(nodeRun.output !== null ? { output: nodeRun.output } : {}),
-      })),
-    ],
+    () => getRunEvents(run),
     [run],
   );
 
@@ -238,11 +242,34 @@ export default function WorkflowPage() {
   const loadedWorkflowId = useRef<string | null>(null);
   const persistQueue = useRef<Promise<void>>(Promise.resolve());
   const savedResetTimer = useRef<number | null>(null);
+  const activeRun = useMemo(
+    () => previousRuns.find((run) => run.id === activeRunId) ?? null,
+    [activeRunId, previousRuns],
+  );
+  const activeRunInitialEvents = useMemo<
+    ExecutionStreamEvent[] | undefined
+  >(() => {
+    if (!activeRun || activeRun.status === "Pending") return undefined;
+    return getRunEvents(activeRun);
+  }, [activeRun]);
   const executionStream = useExecutionStream(
     activeRunId,
-    undefined,
+    activeRunInitialEvents,
     streamBootstrap ?? undefined,
   );
+  const activeRunStatus = useMemo(() => {
+    const workflowEvent = [...executionStream.events]
+      .reverse()
+      .find((event) => event.type === "workflow");
+    if (typeof workflowEvent?.status === "string") {
+      return workflowEvent.status;
+    }
+    return activeRun?.status ?? null;
+  }, [activeRun?.status, executionStream.events]);
+  const activeRunIsLive =
+    Boolean(activeRunId) &&
+    executionStream.state !== "finished" &&
+    (activeRunStatus === null || activeRunStatus === "Pending");
 
   usePageTitle(
     loadError ? "Workflow unavailable" : (workflowName ?? "Loading…"),
@@ -336,7 +363,10 @@ export default function WorkflowPage() {
       .then((runs) => {
         if (cancelled) return;
         setPreviousRuns(runs);
-        if (!activeRunId && runs[0]) setActiveRunId(runs[0].id);
+        const latestRun = runs[0];
+        if (latestRun) {
+          setActiveRunId((current) => current ?? latestRun.id);
+        }
       })
       .catch((requestError: unknown) => {
         if (cancelled) return;
@@ -354,7 +384,7 @@ export default function WorkflowPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeRunId, id, isLoading, loadError]);
+  }, [id, isLoading, loadError]);
 
   const onNodesChange: OnNodesChange = useCallback((changes) => {
     setNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
@@ -861,14 +891,16 @@ export default function WorkflowPage() {
                           {selectedPreviousRunId
                             ? `Run ${selectedPreviousRunId.slice(0, 8)}`
                             : activeRunId
-                              ? `Current run · ${activeRunId.slice(0, 8)}`
+                              ? `${activeRunIsLive ? "Current run" : "Latest run"} · ${activeRunId.slice(0, 8)}`
                               : "Select a run"}
                         </p>
                         <p className="text-[11px] text-[#87867c]">
                           {selectedPreviousRunId
                             ? "Viewing historical logs"
                             : activeRunId
-                              ? "Live execution logs"
+                              ? activeRunIsLive
+                                ? "Live execution logs"
+                                : "Completed run logs"
                               : "Previous runs"}
                         </p>
                       </div>
@@ -895,10 +927,14 @@ export default function WorkflowPage() {
                               }`}
                             >
                               <span className="truncate text-xs">
-                                Current execution
+                                {activeRunIsLive
+                                  ? "Current execution"
+                                  : "Latest execution"}
                               </span>
                               <span className="shrink-0 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] text-[#b0aea6]">
-                                Live
+                                {activeRunIsLive
+                                  ? "Live"
+                                  : (activeRunStatus ?? "Finished")}
                               </span>
                             </button>
                           )}
