@@ -19,5 +19,7 @@ Environment variables (loaded from the repository root `.env`):
 - `REDIS_URL` or `REDIS_HOST`/`REDIS_PORT` (for the pub/sub stream).
 
 Health check: `GET /health`. Stream endpoint: `WS /ws/executions?token=<signed token>`.
+Configure the API's `EXECUTION_WS_URL` to the publicly reachable websocket
+base URL so the web app can connect to this service.
 
 This project was created using `bun init` in bun v1.3.14. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

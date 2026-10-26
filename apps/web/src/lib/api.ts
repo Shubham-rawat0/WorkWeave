@@ -37,13 +37,45 @@ export type SessionInfo = InferResponseType<
     typeof client.api.v1.auth.sessions.$get
 >["sessions"][number];
 
+export type WorkflowRunSummary = {
+    id: string;
+    status: "Pending" | "Success" | "Failure";
+    createdAt: string;
+    finishedAt: string | null;
+    workflow: { id: string; title: string };
+    nodeRuns: Array<{
+        id: string;
+        nodeId: string;
+        nodeType: string;
+        status: string;
+        startedAt: string;
+        completedAt: string | null;
+        error: string | null;
+        output: unknown;
+    }>;
+};
+
+export type WorkflowRunsResponse = {
+    workflowRuns: WorkflowRunSummary[];
+    nextCursor?: string;
+};
+
+type WorkflowRunsQuery = {
+    workflowId: string;
+    status?: "Pending" | "Success" | "Failure";
+    limit?: number;
+    cursor?: string;
+};
+
 type ResponseBody<Response> = Response extends ClientResponse<
     infer Body,
     infer Status,
     "json"
 >
-    ? Status extends 200 | 201
-        ? Body
+    ? Status extends unknown
+        ? Status extends 200 | 201
+            ? Body
+            : never
         : never
     : never;
 
@@ -144,6 +176,12 @@ export const api = {
                 param: { id },
             }),
         ),
+    workflowRuns: (query: WorkflowRunsQuery): Promise<WorkflowRunsResponse> => {
+        const getWorkflowRuns = client.api.v1.workflow.runs.$get as (args: {
+            query: WorkflowRunsQuery;
+        }) => Promise<ClientResponse<WorkflowRunsResponse, 200, "json">>;
+        return unwrap(getWorkflowRuns({ query }));
+    },
     executionStream: (id: string) =>
         unwrap(
             client.api.v1.workflow.workflow.run[":id"].stream.$get({

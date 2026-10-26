@@ -118,6 +118,41 @@ const app = new Hono<{ Variables: { user: User } }>()
     );
 })
 
+.get("/runs",async(c)=>{
+    const input=workflowRunsInputSchema.parse(c.req.query())
+    const userId=c.get("user").id
+    const workflowRuns=await prisma.workflowRun.findMany({
+        where:{
+            workflowId:input.workflowId,
+            workflow:{ userId },
+            ...(input.status && { status: input.status }),
+        },
+        include: {
+            workflow: { select: { id: true, title: true } },
+            nodeRuns: { orderBy: { startedAt: "asc" } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: input.limit + 1,
+        ...(input.cursor && {
+            cursor: { id: input.cursor },
+            skip: 1,
+        }),
+    })
+
+    let nextCursor: string | undefined;
+
+    if (workflowRuns.length > input.limit) {
+        workflowRuns.pop();
+
+        nextCursor = workflowRuns[workflowRuns.length - 1]?.id;
+    }
+    const hydratedworkflowRuns = workflowRuns.map((run) => ({
+        ...run,
+        source: getRunSource(run.metadata),
+    }));
+    return c.json({ workflowRuns: hydratedworkflowRuns, nextCursor });
+})
+
 .get("/:id",async (c)=>{
     const id=c.req.param("id")
     const userId=c.get("user").id
@@ -543,41 +578,6 @@ const app = new Hono<{ Variables: { user: User } }>()
         workflowId: input.workflowId,
         ...(stream ? { stream } : {}),
     });
-})
-
-.get("/runs",async(c)=>{
-    const input=workflowRunsInputSchema.parse(c.req.query())
-    const userId=c.get("user").id
-    const workflowRuns=await prisma.workflowRun.findMany({
-        where:{
-            workflowId:input.workflowId,
-            workflow:{ userId },
-            ...(input.status && { status: input.status }),
-        },
-        include: {
-            workflow: { select: { id: true, title: true } },
-            nodeRuns: { select: { id: true, status: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: input.limit + 1,
-        ...(input.cursor && {
-            cursor: { id: input.cursor },
-            skip: 1,
-        }),
-    })
-
-    let nextCursor: string | undefined;
-
-    if (workflowRuns.length > input.limit) {
-        workflowRuns.pop();
-
-        nextCursor = workflowRuns[workflowRuns.length - 1]?.id;
-    }
-    const hydratedworkflowRuns = workflowRuns.map((run) => ({
-        ...run,
-        source: getRunSource(run.metadata),
-    }));
-    return c.json({ workflowRuns: hydratedworkflowRuns, nextCursor });
 })
 
 .get("/workflow/run/:id",async(c)=>{
