@@ -6,15 +6,10 @@ import {
   AlertCircle,
   ArrowDown,
   Check,
-  CheckCircle2,
-  Circle,
-  Clock3,
   Copy,
   Loader2,
-  MinusCircle,
   Radio,
   Terminal,
-  XCircle,
 } from "lucide-react";
 import { getNodeDef } from "@WorkOrchestrator/shared/nodeRegistry";
 import { cn } from "@/lib/utils";
@@ -28,12 +23,12 @@ type StatusTone =
   "success" | "error" | "running" | "pending" | "skipped" | "neutral";
 
 const TONE_STYLES: Record<StatusTone, string> = {
-  success: "border-emerald-400/25 bg-emerald-400/10 text-emerald-300",
-  error: "border-red-400/25 bg-red-400/10 text-red-300",
-  running: "border-sky-400/25 bg-sky-400/10 text-sky-300",
-  pending: "border-amber-400/25 bg-amber-400/10 text-amber-200",
-  skipped: "border-white/10 bg-white/[0.04] text-[#b0aea6]",
-  neutral: "border-white/10 bg-white/[0.04] text-[#b0aea6]",
+  success: "text-emerald-300",
+  error: "text-red-300",
+  running: "text-sky-300",
+  pending: "text-amber-200",
+  skipped: "text-[#b0aea6]",
+  neutral: "text-[#b0aea6]",
 };
 
 const DOT_STYLES: Record<StatusTone, string> = {
@@ -107,29 +102,6 @@ function getStatusLabel(event: ExecutionStreamEvent, tone: StatusTone): string {
   }
 }
 
-function StatusIcon({
-  tone,
-  className = "size-3.5",
-}: {
-  tone: StatusTone;
-  className?: string;
-}) {
-  switch (tone) {
-    case "success":
-      return <CheckCircle2 className={className} />;
-    case "error":
-      return <XCircle className={className} />;
-    case "running":
-      return <Loader2 className={`${className} animate-spin`} />;
-    case "pending":
-      return <Clock3 className={className} />;
-    case "skipped":
-      return <MinusCircle className={className} />;
-    default:
-      return <Circle className={className} />;
-  }
-}
-
 function StatusPill({
   tone,
   label,
@@ -142,12 +114,11 @@ function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+        "inline-flex shrink-0 text-[10px] font-medium",
         TONE_STYLES[tone],
         className,
       )}
     >
-      <StatusIcon tone={tone} className="size-2.5" />
       {label}
     </span>
   );
@@ -301,16 +272,21 @@ function EventCard({
         )}
       >
         <div className="flex items-center gap-2.5 px-2.5 py-2">
-          <span
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04]"
-            aria-hidden="true"
-          >
-            {isWorkflow ? (
+          {isWorkflow ? (
+            <span
+              className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04]"
+              aria-hidden="true"
+            >
               <Activity className="size-3.5 text-[#d1d0ca]" />
-            ) : (
-              getNodeIcon(nodeType, 15)
-            )}
-          </span>
+            </span>
+          ) : (
+            <span
+              className="flex size-7 shrink-0 items-center justify-center"
+              aria-hidden="true"
+            >
+              {getNodeIcon(nodeType, 15)}
+            </span>
+          )}
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
@@ -524,11 +500,7 @@ export function ExecutionEventFeed({
             </div>
           </div>
         </div>
-        <StatusPill
-          tone={runTone}
-          label={runLabel}
-          className="px-2 py-0.5 text-[11px]"
-        />
+        <StatusPill tone={runTone} label={runLabel} className="text-[11px]" />
       </header>
 
       {connectionMessage && (

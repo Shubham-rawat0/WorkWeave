@@ -11,6 +11,48 @@ import {
 
 const EMPTY_EVENTS: ExecutionStreamEvent[] = [];
 
+function isTerminalWorkflowEvent(event: ExecutionStreamEvent): boolean {
+  return (
+    event.type === "workflow" &&
+    typeof event.status === "string" &&
+    ["success", "failure", "cancelled"].includes(event.status.toLowerCase())
+  );
+}
+
+function appendEvents(
+  current: ExecutionStreamEvent[],
+  incoming: ExecutionStreamEvent[],
+): ExecutionStreamEvent[] {
+  const keys = new Set(
+    current.map((event) =>
+      event.type === "node"
+        ? `${event.type}:${event.nodeId}:${event.status}`
+        : `${event.type}:${event.status}`,
+    ),
+  );
+  let hasTerminalWorkflowEvent = current.some(isTerminalWorkflowEvent);
+  const additions: ExecutionStreamEvent[] = [];
+
+  for (const event of incoming) {
+    const isTerminal = isTerminalWorkflowEvent(event);
+    if (event.type === "workflow" && hasTerminalWorkflowEvent && !isTerminal) {
+      continue;
+    }
+
+    const key =
+      event.type === "node"
+        ? `${event.type}:${event.nodeId}:${event.status}`
+        : `${event.type}:${event.status}`;
+    if (keys.has(key)) continue;
+
+    keys.add(key);
+    additions.push(event);
+    if (isTerminal) hasTerminalWorkflowEvent = true;
+  }
+
+  return [...current, ...additions].slice(-500);
+}
+
 export function useExecutionStream(
   runId: string | null,
   initialEvents: ExecutionStreamEvent[] = EMPTY_EVENTS,
@@ -31,15 +73,7 @@ export function useExecutionStream(
       setState("idle");
       return;
     }
-    if (
-      initialEvents.some(
-        (event) =>
-          event.type === "workflow" &&
-          (event.status === "Success" ||
-            event.status === "Failure" ||
-            event.status === "Cancelled"),
-      )
-    ) {
+    if (initialEvents.some(isTerminalWorkflowEvent)) {
       setState("finished");
       return;
     }
@@ -68,7 +102,7 @@ export function useExecutionStream(
           );
           return;
         }
-        setEvents((current) => [...current, event].slice(-500));
+        setEvents((current) => appendEvents(current, [event]));
       },
       onState: (nextState, message) => {
         setState(nextState);
@@ -101,33 +135,9 @@ export function useExecutionStream(
             ...(nodeRun.output !== null ? { output: nodeRun.output } : {}),
           })),
         ];
-        setEvents((current) => {
-          const keys = new Set(
-            current.map((event) =>
-              event.type === "node"
-                ? `${event.type}:${event.nodeId}:${event.status}`
-                : `${event.type}:${event.status}`,
-            ),
-          );
-          return [
-            ...current,
-            ...snapshotEvents.filter((event) => {
-              const key =
-                event.type === "node"
-                  ? `${event.type}:${event.nodeId}:${event.status}`
-                  : `${event.type}:${event.status}`;
-              if (keys.has(key)) return false;
-              keys.add(key);
-              return true;
-            }),
-          ].slice(-500);
-        });
+        setEvents((current) => appendEvents(current, snapshotEvents));
         setConnectionMessage(null);
-        if (
-          run.status === "Success" ||
-          run.status === "Failure" ||
-          run.status === "Cancelled"
-        ) {
+        if (["Success", "Failure", "Cancelled"].includes(run.status)) {
           setState("finished");
           window.clearInterval(pollTimer);
           disconnect();

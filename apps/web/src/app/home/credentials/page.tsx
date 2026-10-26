@@ -10,11 +10,8 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import Anthropic from "@lobehub/icons/es/Anthropic";
-import Gemini from "@lobehub/icons/es/Gemini";
 import Github from "@lobehub/icons/es/Github";
 import Notion from "@lobehub/icons/es/Notion";
-import OpenAI from "@lobehub/icons/es/OpenAI";
 import { Pencil, Plus, Settings, Trash2 } from "lucide-react";
 import { api, type CredentialSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -35,22 +32,22 @@ const PLATFORMS = [
   {
     value: "openai",
     label: "OpenAI",
-    icon: OpenAI,
-    accent: "bg-[#10A37F]/15 text-[#4FC3A1] ring-[#10A37F]/25",
+    logo: "/logo/openai.svg",
+    accent: "bg-white/10 text-white ring-white/15",
     description: "GPT models for text generation",
   },
   {
     value: "anthropic",
     label: "Anthropic",
-    icon: Anthropic,
-    accent: "bg-[#D97757]/15 text-[#E49A7D] ring-[#D97757]/25",
+    logo: "/logo/anthropic.svg",
+    accent: "bg-white/10 text-white ring-white/15",
     description: "Claude models for AI tasks",
   },
   {
     value: "gemini",
     label: "Gemini",
-    icon: Gemini,
-    accent: "bg-[#4285F4]/15 text-[#7BA7F7] ring-[#4285F4]/25",
+    logo: "/logo/gemini.svg",
+    accent: "bg-white/10 text-white ring-white/15",
     description: "Google AI models",
   },
   {

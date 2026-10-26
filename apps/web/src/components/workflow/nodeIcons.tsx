@@ -11,13 +11,19 @@ import {
   Webhook,
   Zap,
 } from "lucide-react";
-import OpenAI from "@lobehub/icons/es/OpenAI";
-import Anthropic from "@lobehub/icons/es/Anthropic";
-import Gemini from "@lobehub/icons/es/Gemini";
 import Github from "@lobehub/icons/es/Github";
 import Notion from "@lobehub/icons/es/Notion";
 
 export function getNodeIcon(type: string, size = 16): ReactNode {
+  const logo = (src: string, alt = ""): ReactNode => (
+    <img
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      style={{ width: size, height: size }}
+    />
+  );
   switch (type) {
     case "manualTrigger":
     case "triggerNode":
@@ -34,25 +40,15 @@ export function getNodeIcon(type: string, size = 16): ReactNode {
       return <Notion size={size} />;
     case "openaiNode":
     case "aiNode":
-      return <OpenAI size={size} />;
+      return logo("/logo/openai.svg");
     case "geminiNode":
-      return <Gemini size={size} />;
+      return logo("/logo/gemini.svg");
     case "anthropicNode":
-      return <Anthropic size={size} />;
+      return logo("/logo/anthropic.svg");
     case "slackNode":
-      return (
-        <img
-          src="/logo/slack.svg"
-          alt=""
-          width={size}
-          height={size}
-          style={{ width: size, height: size }}
-        />
-      );
+      return logo("/logo/slack.svg", "Slack");
     case "telegramNode":
-      return (
-        <img src="/logo/telegram.svg" alt="" width={size} height={size} style={{ width: size, height: size }} />
-      );
+      return logo("/logo/telegram.svg", "Telegram");
     case "discordNode":
       return <MessageSquare size={size} className="text-indigo-400" />;
     case "conditionNode":
