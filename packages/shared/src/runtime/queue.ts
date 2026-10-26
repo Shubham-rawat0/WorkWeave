@@ -5,6 +5,8 @@ export const queueName = "workflow-runs";
 
 let workflowQueueInstance: Queue | null = null;
 
+// Retry budget: executeNode's permanent-failure check (retryCount >= 3)
+// assumes exactly 3 attempts with exponential backoff starting at 2s.
 const defaultJobOptions: NonNullable<QueueOptions["defaultJobOptions"]> = {
     attempts: 3,
     backoff: {
@@ -23,6 +25,8 @@ function createQueueOptions():QueueOptions{
 }
 
 export function getWorkflowQueue():Queue{
+    // Singleton: instances keep a socket per queue; recreating per call would
+    // leak connections across every enqueue.
     if (workflowQueueInstance){
         return workflowQueueInstance
     }

@@ -34,7 +34,7 @@ export async function executeCronTrigger(data:CronTriggerNodeData,nodeRunId:stri
         ...(typeof data.dayOfWeek === "number"
             ? { dayOfWeek: data.dayOfWeek }
             : {}),
-        timezone: data.timezone ?? "UTC",
+        timezone: "Asia/Kolkata",
         triggeredAt,
     };
 }

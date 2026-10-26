@@ -14,6 +14,8 @@ function readEdgeEndpoint(value: unknown, key: "source" | "target"): string | nu
     return typeof endpoint === "string" ? endpoint.trim() : null;
 }
 
+// Three-state DFS (VISITING/VISITED): hitting a VISITING node means the
+// current path loops back — i.e. a cycle.
 function hasCycle(nodeIds: ReadonlySet<string>, edges: ReadonlyArray<{ source: string; target: string }>): boolean {
     const adjacency = new Map<string, string[]>();
     for (const id of nodeIds) {
@@ -50,6 +52,8 @@ function hasCycle(nodeIds: ReadonlySet<string>, edges: ReadonlyArray<{ source: s
     return false;
 }
 
+// Rejects malformed graphs before they are persisted: unique node ids,
+// edges that reference real nodes, no duplicate edges, no cycles.
 export function validateWorkflowGraph(
     nodes: readonly unknown[],
     edges: readonly unknown[],
@@ -107,6 +111,8 @@ export function validateWorkflowGraph(
     return errors;
 }
 
+// Reads the run mode recorded at /execute / webhook ingestion
+// ("manual" | "manual-node" | "webhook" | "cron") for API consumers.
 export function getRunSource(metadata: unknown): string | null {
     if (!metadata || typeof metadata !== "object") return null;
     const source = (

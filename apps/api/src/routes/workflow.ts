@@ -13,6 +13,8 @@ import { resolveExecutionStreamSigningSecret, resolveExecutionStreamWsBaseUrlFro
 import { signExecutionStreamToken } from "@WorkOrchestrator/shared/executionSignature";
 import { getWebhookEndpointUrls, syncWebhookEndpoints } from "../lib/webhooks";
 
+// Prisma requires its JsonNull sentinel for null JSON columns; values
+// (including objects and arrays) pass through as-is.
 function toJson(value: unknown): Prisma.InputJsonValue {
     if (value === null) {
         return Prisma.JsonNull as unknown as Prisma.InputJsonValue;
@@ -20,6 +22,8 @@ function toJson(value: unknown): Prisma.InputJsonValue {
     return value as Prisma.InputJsonValue;
 }
 
+// Mints a short-lived signed WS token + client bootstrap so the creator of a
+// run can watch its live events without a full auth handshake per reconnect.
 function createExecutionStreamBootstrap(runId: string, userId: string) {
     const token = signExecutionStreamToken(
         {
@@ -382,6 +386,10 @@ const app = new Hono<{ Variables: { user: User } }>()
 .post("/execute",zValidator("json",executeWorkflowInputSchema,validationHook),async(c)=>{
     const input=c.req.valid("json")
     const userId=c.get("user").id
+    // Three mutually exclusive run modes: { nodeId } = single-node run
+    // ("manual-node"), { triggerSource, triggerNodeId } = trigger-driven run
+    // ("webhook"/"cron"), no params = full manual run ("manual"). The
+    // metadata written below is how the worker decides single node vs full graph.
     if (input.nodeId && (input.triggerSource || input.triggerNodeId)) {
         throw new HTTPException(400, { message: "Provide either nodeId or triggerSource not both." }) 
     }
@@ -473,6 +481,8 @@ const app = new Hono<{ Variables: { user: User } }>()
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     let workflowRun
     try {
+        // Per-user reservation lock serialises the concurrency check so two
+        // simultaneous requests cannot both pass the pending-run limit.
         workflowRun = await withUserRunReservationLock(userId,()=>prisma.$transaction(async(tx)=>{
             await tx.usageRecord.upsert({
                 where: { userId_month: { userId: userId, month } },
@@ -548,12 +558,15 @@ const app = new Hono<{ Variables: { user: User } }>()
         throw error;
     }
     try {
+        // jobId keyed by the run id: BullMQ treats it as the dedupe key, and
+        // the cancel route resolves the job by runId using the same key.
         await getWorkflowQueue().add(
             "process-workflow",
             { workflowRunId: workflowRun.id },
             { jobId: workflowRun.id },
         );
     } catch {
+        // Compensate: never charge a run that never reached the queue.
         await prisma.$transaction([
             prisma.workflowRun.update({
                 where: { id: workflowRun.id },
@@ -637,6 +650,8 @@ const app = new Hono<{ Variables: { user: User } }>()
 .post("/workflow/run/:id/cancel", async (c) => {
     const runId = c.req.param("id");
     const userId = c.get("user").id;
+    // Guarded update acts as CAS: only Pending runs flip to Cancelled; the
+    // worker rechecks status before starting, so it skips this id either way.
     const result = await prisma.workflowRun.updateMany({
         where: {
             id: runId,

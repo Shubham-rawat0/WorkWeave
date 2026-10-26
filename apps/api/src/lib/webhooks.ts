@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { prisma, Prisma } from "@WorkOrchestrator/prisma";
 import { decryptJson, encryptJson } from "@WorkOrchestrator/shared/crypto";
 
+// Tokens are stored hashed so a DB leak never exposes usable webhook URLs.
 export function hashWebhookToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -26,6 +27,9 @@ function getWebhookNodeIds(nodes: unknown): string[] {
   });
 }
 
+// Keeps webhookEndpoint rows in step with the workflow's webhookTrigger
+// nodes: removes endpoints for deleted nodes, issues one random token with
+// encrypted copy for each newly added trigger.
 export async function syncWebhookEndpoints(
   tx: Prisma.TransactionClient,
   workflowId: string,
@@ -70,6 +74,8 @@ export async function syncWebhookEndpoints(
   }
 }
 
+// Builds the caller-facing webhook URL by decrypting the stored token —
+// read-heavy (decrypt per endpoint) so it stays out of list queries.
 export async function getWebhookEndpointUrls(
   workflowId: string,
 ): Promise<Array<{ nodeId: string; url: string }>> {

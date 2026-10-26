@@ -5,6 +5,8 @@ import { executeWorkflow } from "./engine/executor";
 
 const WORKER_ID = `worker-${process.pid}`;
 
+// BullMQ consumer for run jobs. Concurrency is local throughput only —
+// actual mutual exclusion per run is enforced by the executor's Redis/DB lock.
 export const worker=new Worker<WorkflowJobData>(queueName,async(job)=>{
     try{
         await executeWorkflow(job.data.workflowRunId)

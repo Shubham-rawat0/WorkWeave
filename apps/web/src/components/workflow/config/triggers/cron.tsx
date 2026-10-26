@@ -31,7 +31,6 @@ export function CronTriggerConfig({ data, onSave }: ConfigProps) {
   const [hour, setHour] = useState(String(data.hour ?? 9));
   const [minute, setMinute] = useState(String(data.minute ?? 0));
   const [dayOfWeek, setDayOfWeek] = useState(String(data.dayOfWeek ?? 1));
-  const [timezone, setTimezone] = useState(data.timezone || "UTC");
   const [responseName, setResponseName] = useState(data.responseName || "");
 
   const validTime =
@@ -49,7 +48,7 @@ export function CronTriggerConfig({ data, onSave }: ConfigProps) {
       hour: Number(hour),
       minute: Number(minute),
       ...(schedule === "weekly" ? { dayOfWeek: Number(dayOfWeek) } : {}),
-      timezone,
+      timezone: "Asia/Kolkata",
       responseName: responseName || undefined,
     });
   }
@@ -90,12 +89,12 @@ export function CronTriggerConfig({ data, onSave }: ConfigProps) {
           options={DAYS}
         />
       )}
-      <TextField
-        label="Timezone"
-        value={timezone}
-        onChange={setTimezone}
-        placeholder="UTC"
-      />
+      <div className="space-y-2">
+        <p className="text-sm text-white/80">Timezone</p>
+        <p className="text-sm text-white/60">
+          India Standard Time (Asia/Kolkata, UTC+05:30)
+        </p>
+      </div>
       <ResponseNameField value={responseName} onChange={setResponseName} />
       {!validTime && (
         <p role="alert" className="text-sm text-red-400">

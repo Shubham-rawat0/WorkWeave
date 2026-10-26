@@ -5,6 +5,8 @@ export const LOCK_TTL_SECONDS = 5 * 60;
 
 const redis=getMainRedisClient()
 
+// Redis lock key per run; the workerId is the lock value so renew/release
+// can prove ownership before acting.
 function lockKey(workflowRunId: string): string {
     return `lock:workflow-run:${workflowRunId}`;
 }
@@ -13,6 +15,9 @@ function getLockStaleBeforeDate(ttlSeconds: number = LOCK_TTL_SECONDS): Date {
     return new Date(Date.now() - Math.max(1, Math.floor(ttlSeconds)) * 1000);
 }
 
+// Redis is the fast path; the DB-backed lock is only a degraded-mode
+// fallback — `lockedAt` older than TTL marks the owner as dead and lets
+// the lock be reclaimed by other workers.
 async function acquireDBLock(
     workflowRunId: string,
     workerId: string,
@@ -75,6 +80,8 @@ async function isDbLocked(
     return run.lockedAt >= getLockStaleBeforeDate(ttlSeconds);
 }
 
+// Compare-and-mutate via Lua: check the lock was written by this exact
+// workerId before releasing/renewing, all atomically in Redis.
 async function mutateLockIfOwned(
     workflowRunId: string,
     workerId: string,

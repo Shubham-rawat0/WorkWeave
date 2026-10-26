@@ -13,6 +13,8 @@ function getKey():Buffer{
 }
 
 //credentials encryption
+// Wire format: base64(iv[12] || authTag[16] || ciphertext) — AES-256-GCM,
+// random IV per secret so identical credentials never produce equal blobs.
 function encrypt(secret:string):string{
   const key=getKey()
   const iv = crypto.randomBytes(IV_LENGTH);
@@ -33,6 +35,7 @@ function decrypt(plainText:string):string{
   const encrypted = packed.subarray(IV_LENGTH + TAG_LENGTH)
 
   const decipher=crypto.createDecipheriv(ALGORITHM,key,iv)
+  // setAuthTag enables GCM's AEAD check: tampering makes final() throw.
   decipher.setAuthTag(tag)
   let decrypted=decipher.update(encrypted)
   decrypted = Buffer.concat([decrypted, decipher.final()]);

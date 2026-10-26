@@ -53,6 +53,8 @@ function getWorkflowRunSource(metadata: unknown): string | null {
     return typeof source === "string" ? source : null;
 }
 
+// A skipped run is treated as completed only when it carries bypass
+// passthrough data (deactivated node); plain skips halt their subtree.
 function isBypassedSkipOutput(output: unknown): output is {
     bypassed: true;
     passthrough?: unknown;
@@ -68,6 +70,8 @@ function isBypassedSkipOutput(output: unknown): output is {
     );
 }
 
+// Route a bypassed condition node takes when it can't evaluate — the
+// default edge is kept alive so deactivated conditions don't deadlock flows.
 function getConditionDefaultRoute(node: WorkflowNode): string {
     if (node.type!=="conditionNode"){
         return "default"
@@ -124,6 +128,9 @@ function buildBypassedNodeOutput(node:WorkflowNode,
     };
 }
 
+// Returns the run's target node id ONLY for `source: "manual-node"` — any
+// other source (or malformed metadata) yields null and takes the full graph
+// path via selectTriggerEntryNodes below.
 function getTargetNodeId(metadata: unknown): string | null {
     if (!metadata || typeof metadata !== "object") {
         return null;
@@ -167,6 +174,8 @@ async function getNodeRunsMinimal(workflowRunId: string): Promise<NodeRun[]> {
     );
 }
 
+// Runs a single node without touching the graph. Returns a BatchResult
+// (never throws) so callers can mix node outcomes inside a batch Promise.all.
 async function executeSingleNode(
     workflowRunId: string,
     node: WorkflowNode,
@@ -282,6 +291,8 @@ function shouldSkipNode(
     return activeSources.every((sourceId) => skippedNodeIds.has(sourceId));
 }
 
+// Idempotent: reuse the node's existing nodeRun row if one exists from a
+// previous attempt, so skip records survive run recovery.
 async function markNodeSkipped(
     workflowRunId: string,
     node: WorkflowNode,
@@ -335,6 +346,8 @@ async function markNodeSkipped(
         .catch(() => { });
 }
 
+// Condition nodes may report the chosen route as `route` or as the first
+// entry of `routes`; anything else falls back to the node's default route.
 function extractSelectedRoute(output: unknown): string {
     if (!output || typeof output !== "object") {
         return "default";
@@ -389,6 +402,8 @@ function applyConditionEdgeActivation(
     }
 }
 
+// Fetches outputs for exactly the nodes that just succeeded in the previous
+// batch — needed to activate condition edges and feed downstream inputs.
 async function getNodeRunOutputs(
     workflowRunId: string,
     nodeIds: string[],
@@ -414,6 +429,8 @@ async function getNodeRunOutputs(
     }));
 }
 
+// Final status: any failure fails the run; otherwise success requires every
+// reachable node to have been either completed or (any kind of) skipped.
 function determineFinalStatus(
     totalNodes: number,
     completedCount: number,
@@ -452,6 +469,10 @@ async function updateWorkflowStatus(
         .catch(() => { });
 }
 
+// Chooses the entry points for a full run from the run's recorded source:
+// "manual" → all active manual triggers; "webhook"/"cron" → exactly the
+// referenced trigger, with type/active/configured revalidated (the API's
+// verdict may be stale by the time the worker picks the job up).
 function selectTriggerEntryNodes(
     metadata: unknown,
     nodes: WorkflowNode[],
@@ -562,6 +583,8 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
         Math.floor((LOCK_TTL_SECONDS * 1000) / 2),
     );
 
+    // Heartbeat at half the TTL so long workflows never lose the lock
+    // (and a crashed worker's lock expires on its own).
     const lockHeartbeat=setInterval(()=>{
         renewLock(WORKER_ID,workflowRunId).catch((error)=>{
             console.error(
@@ -571,7 +594,9 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
         })
     },lockHeartbeatIntervalMs)
 
-    try {
+try {
+        // CAS: only claim Pending/Running runs. A run cancelled while queued
+        // (or already finalized elsewhere) is silently skipped here.
         const started = await prisma.workflowRun.updateMany({
             where: {
                 id: workflowRunId,
@@ -617,7 +642,10 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
         const workflowRunSource=getWorkflowRunSource(workflowRun.metadata)
 
         const allNodesById=new Map(nodes.map((node)=>[node.id,node]))
-        //execute single target node if present
+        // Single-node fast path: `source: "manual-node"` runs execute ONLY
+        // the target node — no graph traversal, no downstream. Incoming edges
+        // exist purely to assemble its input from prior run outputs, and the
+        // run completes right after this one node succeeds or fails.
         if (targetNodeId){
             const targetNode = nodes.find((node) => node.id === targetNodeId);
             if (!targetNode) {
@@ -714,6 +742,9 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
             }
         }
 
+        // Seed state from previous node runs (resumable replay): successful
+        // nodes keep their outputs, bypassed "skips" count as completed so
+        // their passthrough data still flows downstream.
         for (const nodeRun of workflowRun.nodeRuns){
             if (!reachableNodeIdSet.has(nodeRun.nodeId)){
                 continue
@@ -750,6 +781,9 @@ export async function executeWorkflow(workflowRunId: string): Promise<void> {
         }
 
         let batchNumber=0
+        // Batch loop: run every node whose dependencies have resolved, then
+        // re-evaluate. A failed node blocks its own subtree, which is why
+        // final status is derived from the completed/skipped sets below.
         while (true){
             const pendingNodes=reachableNodes.filter((node)=>!completedNodeIds.has(node.id) && !failedNodeIds.has(node.id) && !skippedNodeIds.has(node.id))
 

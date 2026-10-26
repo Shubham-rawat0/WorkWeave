@@ -26,6 +26,7 @@ function toJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
+// Drops auth/cookie headers so caller credentials never land in run metadata.
 function getSafeHeaders(headers: Headers): Record<string, string> {
   return Object.fromEntries(
     [...headers.entries()].filter(
@@ -57,6 +58,8 @@ const app = new Hono().use("*", createRateLimiter(60, 60_000)).post(
   }),
   async (c) => {
     const { workflowId, token } = c.req.param();
+    // Tokens are 43-char URL-safe base64 (32 random bytes). Endpoints store a
+    // SHA-256 hash, so the plaintext token never touches the database.
     if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
       throw new HTTPException(404, { message: "Webhook not found" });
     }
@@ -132,6 +135,8 @@ const app = new Hono().use("*", createRateLimiter(60, 60_000)).post(
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     let workflowRun;
     try {
+      // Same concurrency/quota reservation as /execute — external callers
+      // count against the user's limits exactly like manual runs do.
       workflowRun = await withUserRunReservationLock(userId, () =>
         prisma.$transaction(async (tx) => {
           await tx.usageRecord.upsert({

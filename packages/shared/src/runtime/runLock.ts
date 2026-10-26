@@ -32,6 +32,8 @@ function getUserLockKey(userId:string):string{
     return `redis-user-lock-key:user:${userId}`
 }
 
+// Compare-token delete: ownership tokens make releasing safe — one holder
+// can never delete a lock still owned by another request.
 async function releaseLock(key:string,token:string):Promise<void>{
      await redis.eval(
         `if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -45,7 +47,12 @@ async function releaseLock(key:string,token:string):Promise<void>{
     )
 }
 
+// Bounded retry loop: poll with small sleeps up to `waitMs`, never hold the
+// caller host-side longer than that (TTL covers crashed holders).
 export async function withUserRunReservationLock<T>(userId:string,fn:()=>Promise<T>):Promise<T>{
+    // Serialises cross-process run reservations per user. Without this, two
+    // API instances could both pass the pending-run concurrency check and
+    // oversubscribe the user's execution slots.
     const { ttlSec, waitMs, retryMs } = getConfig();
     const key=getUserLockKey(userId)
     const token=randomUUID()

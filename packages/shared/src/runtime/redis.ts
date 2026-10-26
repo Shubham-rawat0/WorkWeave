@@ -28,6 +28,8 @@ const REDIS_CONNECT_ERROR_CODES = new Set([
 ]);
 
 
+// maxRetriesPerRequest:null is required for BullMQ workers (commands may
+// wait indefinitely); lazyConnect defers the socket so apps boot without Redis.
 const commonRedisOptions: RedisConnectionOptions = {
     maxRetriesPerRequest: null,
     lazyConnect: true,
@@ -47,6 +49,8 @@ function parseRedisPort(value: string | undefined, fallback: number): number {
     return parsed;
 }
 
+// REDIS_URL / UPSTASH_REDIS_URL win over discrete env vars; full URL also
+// encodes username/password/db — parse them into the connection options.
 function parseRedisUrl(url: string): RedisConnectionOptions {
     const parsed = new URL(url);
     if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:") {
@@ -140,6 +144,8 @@ function getErrorCode(error: unknown): string | null {
     return maybeCode;
 }
 
+// Recursively matches transport-level failures (including ioredis's
+// MultiError envelope); non-connection errors must propagate untouched.
 export function isRedisConnectionError(error: unknown): boolean {
     const code = getErrorCode(error);
     if (code && REDIS_CONNECT_ERROR_CODES.has(code)) {
@@ -167,6 +173,8 @@ export function isRedisConnectionError(error: unknown): boolean {
     return false;
 }
 
+// One warning per label per 30s: lazyConnect retries produce recurring
+// errors that would otherwise spam logs.
 function logThrottledWarning(
     store: Map<string, number>,
     key: string,
@@ -194,6 +202,8 @@ function attachRedisErrorLogging(client: Redis, label: string): void {
     });
 }
 
+// Runs `operation` on Redis and, on connection errors only (not app errors),
+// degrades to `fallback` so locking/deduping keeps working when Redis is down.
 export async function withRedisFallback<T>(
     context: string,
     operation: () => Promise<T>,

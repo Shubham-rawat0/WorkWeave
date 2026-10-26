@@ -40,6 +40,8 @@ const DB_HEALTHCHECK_RETRY_DELAY_MS = (() => {
     return 500;
 })();
 
+// Per-process memory of the last bucket each schedule fired for — closes the
+// gap between Redis dedupe failures and tolerates tick overlap.
 const lastScheduledBucket = new Map<string, string>();
 
 const CRON_DEDUPE_TTL_SECONDS = (() => {
@@ -161,8 +163,9 @@ async function isDatabaseHealthy(): Promise<boolean> {
     return false;
 }
 
-function nowUtc() {
-    const now = new Date();
+function nowIndiaTime() {
+    // Shift to India Standard Time (UTC+05:30), then read UTC fields.
+    const now = new Date(Date.now() + 330 * 60 * 1000);
     return {
         now,
         minute: now.getUTCMinutes(),
@@ -174,6 +177,8 @@ function nowUtc() {
     };
 }
 
+// Clamps user config to safe ranges; malformed or missing fields fall back
+// to a daily 09:00 schedule instead of a never-firing cron.
 function resolveSchedule(node: WorkflowNode): {
     schedule: "every_5_minutes" | "hourly" | "daily" | "weekly";
     hour: number;
@@ -202,11 +207,13 @@ function resolveSchedule(node: WorkflowNode): {
     return { schedule, hour, minute, dayOfWeek };
 }
 
+// Bucket keys carry the scheduled period (minute/hour/day) and become the
+// Redis dedupe key so each period fires the schedule at most once.
 function isDue(node: WorkflowNode): {
     due: boolean;
     bucket: string;
 } {
-    const { minute, hour, dayOfWeek, year, month, day } = nowUtc();
+    const { minute, hour, dayOfWeek, year, month, day } = nowIndiaTime();
     const cfg = resolveSchedule(node);
 
     if (cfg.schedule === "every_5_minutes") {
@@ -233,6 +240,8 @@ function isDue(node: WorkflowNode): {
     return { due, bucket };
 }
 
+// Atomically creates the run and bumps the monthly usage counter inside one
+// transaction, re-checking the concurrency gate at the last moment.
 async function reserveCronRun(params: {
     workflowId: string;
     userId: string;
@@ -299,6 +308,8 @@ async function rollbackRunReservation(
     userId: string,
     month: string,
 ): Promise<void> {
+    // Compensating action: the reservation transaction committed a run
+    // and a runCount increment; if enqueue fails, undo both.
     await prisma.$transaction([
         prisma.workflowRun.update({
             where: { id: runId },
@@ -319,6 +330,8 @@ async function rollbackRunReservation(
     ]);
 }
 
+// Ticks skip entirely if the DB is down — creating runs that can't be
+// reserved/queued against a failing database is worse than waiting.
 async function tick():Promise<void>{
     const dbHealthy=await isDatabaseHealthy()
     if (!dbHealthy) {
@@ -362,6 +375,10 @@ async function tick():Promise<void>{
                 continue;
             }
             const dedupeKey = `${workflow.id}:${node.id}`;
+            // Dedupe per time bucket so cron fires at most once per bucket
+            // even with multiple worker instances or worker restarts: layer 1
+            // is in-memory, layer 2 is a Redis NX key with a long TTL (its
+            // failure releases the lock so the next tick can retry).
             if (lastScheduledBucket.get(dedupeKey) === bucket) {
                 continue;
             }
@@ -437,6 +454,8 @@ export function startCronScheduler(): () => void {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const scheduleNextTick = () => {
         if (stopped) return;
+        // Align every tick to the minute boundary: the hour/minute checks
+        // below only work if evaluates happen within the right minute.
         const now = Date.now();
         const delay = 60_000 - (now % 60_000);
         timer = setTimeout(() => {

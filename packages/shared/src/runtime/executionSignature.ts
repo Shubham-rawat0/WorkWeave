@@ -27,6 +27,8 @@ function signSegment(payload:string,secret:string):string{
     return  createHmac("sha-256",secret).update(payload).digest("base64url")
 }
 
+// Structural validation only (types/versions) — cryptographic checks and
+// expiry live at the call sites; assertions narrow the type for TS.
 function assertValidPayload(
     payload: unknown,
 ): asserts payload is ExecutionStreamTokenPayload {
@@ -47,6 +49,11 @@ function assertValidPayload(
     }
 }
 
+/**
+ * Signed execution-stream tokens: base64url(payload).base64url(HMAC-SHA256).
+ * No JWT library — deliberately minimal, ~5min TTL, keyed by run + user so a
+ * leaked token can only watch one specific run's pub/sub feed.
+ */
 export function signExecutionStreamToken(input: SignExecutionStreamTokenInput, secret: string): string {
     return signExecutionStreamTokenImpl(input, secret);
 }
@@ -91,6 +98,8 @@ export function verifyExecutionStreamToken(input: string, secret: string, now: D
 }
 export { verifyExecutionStreamToken as verifyExecutionStream };
 
+// Rebuilds the expected HMAC for the payload segment and compares in
+// constant time — verification recomputes rather than trusting the input.
 function verifyExecutionStreamTokenImpl(input: string, secret: string, now: Date): ExecutionStreamTokenPayload {
     if (!secret || secret.trim().length === 0) {
         throw new Error("No execution signature");
@@ -122,6 +131,8 @@ function verifyExecutionStreamTokenImpl(input: string, secret: string, now: Date
     } catch {
         throw new Error("Execution stream token signature is invalid.");
     }
+    // timingSafeEqual: constant-time comparison prevents signature
+    // forgery through response-timing side channels.
     if (
         providedSigBuffer.length !== expectedSigBuffer.length ||
         !timingSafeEqual(providedSigBuffer, expectedSigBuffer)

@@ -67,8 +67,11 @@ export function NodeConfigDialog({
     if (isSaving) return;
     try {
       setIsSaving(true);
-      const nextIsConfigured =
-        typeof data.isConfigured === "boolean" ? data.isConfigured : true;
+      // A successful config save means the node is now configured — the
+      // scheduler/webhook/execute paths all gate on isConfigured === true,
+      // so echoing back a pre-existing `false` here would leave cron and
+      // webhook triggers permanently unschedulable.
+      const nextIsConfigured = true;
       await Promise.resolve(
         onSave(nodeId, { ...data, isConfigured: nextIsConfigured }),
       );

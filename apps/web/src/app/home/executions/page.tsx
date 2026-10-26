@@ -278,16 +278,10 @@ function RunRow({
       className={cn(
         "relative overflow-hidden rounded-xl border bg-[#151515] transition-colors",
         expanded
-          ? "border-[#F04D26]/35 bg-[#181818] shadow-[0_8px_30px_rgba(0,0,0,0.2)]"
+          ? "border-white/[0.07] bg-[#181818] shadow-[0_8px_30px_rgba(0,0,0,0.2)]"
           : "border-white/[0.07] hover:border-white/[0.14] hover:bg-[#191919]",
       )}
     >
-      {expanded && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-0.5 bg-[#F04D26]"
-        />
-      )}
       <div className="flex items-center gap-2 px-2">
         <button
           type="button"

@@ -1,5 +1,6 @@
 import type { WorkflowEdge, WorkflowNode } from "./types/nodes";
 
+// Builds source -> [targets] adjacency; node with no edges maps to [].
 export function buildAdjacency(nodes:WorkflowNode[], edges:WorkflowEdge[]):Map<string,string[]>{
     const graph=new Map<string,string[]>()
     for (const node of nodes){
@@ -31,6 +32,8 @@ export function calculateInDegree(
     return inDeg
 }
 
+// Colors the DFS stack (recursion + exit): hitting a node already "on the
+// stack" means a cycle — visited nodes without it are merely cross branches.
 export function hasCycle(
     nodes: WorkflowNode[],
     edges: WorkflowEdge[],
@@ -63,6 +66,8 @@ export function hasCycle(
     return false
 }
 
+// Nodes left with indegree > 0 after the batch unwind are unreachable —
+// that situation is exactly what a cycle produces.
 export function executionBatch(nodes:WorkflowNode[],edges:WorkflowEdge[]):WorkflowNode[][]{
     if (nodes.length===0){
         return []
@@ -96,6 +101,9 @@ export function executionBatch(nodes:WorkflowNode[],edges:WorkflowEdge[]):Workfl
     return batches
 }
 
+// Forward BFS from the trigger entry points (or every trigger when no start
+// ids are given). Nodes not downstream of an entry — disconnected islands —
+// are excluded from the run entirely.
 export function getReachableNodes(
     nodes: WorkflowNode[],
     edges: WorkflowEdge[],
@@ -146,6 +154,8 @@ export function getReachableNodes(
     return nodes.filter((n) => visited.has(n.id));
 }
 
+// Runs a node once every one of its incoming edges has a completed source
+// (simple AND join; condition routing handled by the executor instead).
 export function getReadyNodes(
     nodes: WorkflowNode[],
     edges: WorkflowEdge[],
