@@ -1,4 +1,4 @@
-import { tool } from "ai"
+import { tool, type Tool } from "ai"
 import z from "zod"
 import { createWorkflow, deleteWorkflow, executeWorkflow, getWorkflow, listWorkflows, updateWorkflow } from "../services/workflowService"
 import { createWorkflowInputSchema, executeWorkflowInputSchema, MAX_ID_LENGTH, updateWorkflowInputSchema } from "../schemas/workflow";
@@ -23,27 +23,6 @@ interface WorkflowEdge {
     sourceHandle?: string | null;
     targetHandle?: string | null;
 }
-
-const list_workflow = tool({
-    description: "List all workflows of a user",
-    inputSchema: z.object({
-        userId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-    }),
-    execute: async ({ userId }: { userId: string }) => {
-        return await listWorkflows(userId);
-    },
-});
-
-const get_workflow = tool({
-    description: "get a particular workflow using workflowId and userId",
-    inputSchema: z.object({
-        workflowId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-        userId: z.string().min(1).max(MAX_ID_LENGTH)
-    }),
-    execute: async ({ userId, workflowId }: { userId: string, workflowId: string }) => {
-        return await getWorkflow(userId, workflowId)
-    }
-})
 
 const list_available_triggers = tool({
     description: "list all the available and valid triggers that can be used in workflow",
@@ -128,80 +107,70 @@ const validate_workflow = tool({
     }
 })
 
-const create_workflow = tool({
-    description: "Create a workflow for a user with the provided configuration.",
-    inputSchema: z.object({
-        userId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-        input: createWorkflowInputSchema,
-    }),
-    execute: async ({ userId, input }) => {
-        return await createWorkflow(userId, input);
-    },
-});
-
-const update_workflow = tool({
-    description: "update a exisiting workflow",
-    inputSchema: z.object({ userId: z.string(), input: updateWorkflowInputSchema }),
-    execute: async ({ userId, input }) => {
-        return await updateWorkflow(userId, input)
-    }
-})
-
-const execute_workflow = tool({
-    description: "Queue an execution for a workflow owned by a user. Supports full manual runs, one node, or a configured cron/webhook trigger.",
-    inputSchema: z.object({
-        userId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-        input: executeWorkflowInputSchema,
-    }),
-    execute: async ({ userId, input }) => {
-        const run = await executeWorkflow(userId, input);
-        return {
-            runId: run.id,
-            workflowId: input.workflowId,
-            status: run.status,
-        };
-    },
-});
-
-const delete_workflow = tool({
-    description: "Delete a workflow owned by a user.",
-    inputSchema: z.object({
-        userId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-        workflowId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-    }),
-    execute: async ({ userId, workflowId }) => {
-        await deleteWorkflow(userId, workflowId);
-        return { success: true, workflowId };
-    },
-});
-
-const list_credentials = tool({
-    description: "List a user's saved credentials without returning secret keys.",
-    inputSchema: z.object({
-        userId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-    }),
-    execute: async ({ userId }) => prisma.credentials.findMany({
-        where: { userId },
-        select: {
-            id: true,
-            title: true,
-            platform: true,
-            createdAt: true,
-            updatedAt: true,
-        },
-        orderBy: { updatedAt: "desc" },
-    }),
-});
-
-export const workflowTools = {
-    list_workflow,
-    get_workflow,
-    list_available_triggers,
-    list_available_actions,
-    list_node_types,
-    validate_workflow,
-    create_workflow,
-    delete_workflow,
-    list_credentials,
-    execute_workflow
-};
+export function agentWorkflowTools(userId: string): Record<string, Tool> {
+    return {
+        list_workflow: tool({
+            description: "List all workflows belonging to the current user.",
+            inputSchema: z.object({}),
+            execute: async () => listWorkflows(userId),
+        }),
+        get_workflow: tool({
+            description: "Get a particular workflow belonging to the current user.",
+            inputSchema: z.object({
+                workflowId: z.string().trim().min(1).max(MAX_ID_LENGTH),
+            }),
+            execute: async ({ workflowId }) => getWorkflow(userId, workflowId),
+        }),
+        list_available_actions,
+        list_available_triggers,
+        list_node_types,
+        validate_workflow,
+        create_workflow: tool({
+            description: "Create a workflow for the current user with the provided configuration.",
+            inputSchema: createWorkflowInputSchema,
+            execute: async (input) => createWorkflow(userId, input),
+        }),
+        update_workflow: tool({
+            description: "Update a workflow belonging to the current user.",
+            inputSchema: updateWorkflowInputSchema,
+            execute: async (input) => updateWorkflow(userId, input),
+        }),
+        execute_workflow: tool({
+            description: "Queue an execution for a workflow belonging to the current user. Supports full manual runs, one node, or a configured cron/webhook trigger.",
+            inputSchema: executeWorkflowInputSchema,
+            execute: async (input) => {
+                const run = await executeWorkflow(userId, input);
+                return {
+                    runId: run.id,
+                    workflowId: input.workflowId,
+                    status: run.status,
+                };
+            },
+        }),
+        delete_workflow: tool({
+            description: "Delete a workflow belonging to the current user.",
+            inputSchema: z.object({
+                workflowId: z.string().trim().min(1).max(MAX_ID_LENGTH),
+            }),
+            execute: async ({ workflowId }) => {
+                await deleteWorkflow(userId, workflowId);
+                return { success: true, workflowId };
+            },
+        }),
+        list_credentials: tool({
+            description: "List the current user's saved credentials without returning secret keys.",
+            inputSchema: z.object({}),
+            execute: async () => prisma.credentials.findMany({
+                where: { userId },
+                select: {
+                    id: true,
+                    title: true,
+                    platform: true,
+                    createdAt: true,
+                    updatedAt: true,
+                },
+                orderBy: { updatedAt: "desc" },
+            }),
+        }),
+    };
+}
