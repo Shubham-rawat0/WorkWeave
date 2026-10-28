@@ -7,9 +7,9 @@ import { validateWorkflowGraph } from "../lib/workflow";
 import type { createWorkflowInputSchema, executeWorkflowInputSchema, updateWorkflowInputSchema } from "../schemas/workflow";
 import type { z } from "zod";
 
-type CreateWorkflowInput = z.infer<typeof createWorkflowInputSchema>;
-type UpdateWorkflowInput = z.infer<typeof updateWorkflowInputSchema>;
-type ExecuteWorkflowInput = z.infer<typeof executeWorkflowInputSchema>;
+export type CreateWorkflowInput = z.infer<typeof createWorkflowInputSchema>;
+export type UpdateWorkflowInput = z.infer<typeof updateWorkflowInputSchema>;
+export type ExecuteWorkflowInput = z.infer<typeof executeWorkflowInputSchema>;
 
 // Prisma requires its JsonNull sentinel for null JSON columns; objects and
 // arrays can be passed through unchanged.
