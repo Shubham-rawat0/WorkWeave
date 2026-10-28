@@ -172,6 +172,25 @@ export const api = {
             typeof client.api.v1.workflow.update.$post
         >["json"],
     ) => unwrap(client.api.v1.workflow.update.$post({ json: body })),
+    deleteWorkflow: async (id: string) => {
+        const response = await client.api.v1.workflow[":id"].$delete({
+            param: { id },
+        });
+        if (response.status !== 204) {
+            const body: unknown = await response
+                .clone()
+                .json()
+                .catch(() => null);
+            const message =
+                body &&
+                typeof body === "object" &&
+                "message" in body &&
+                typeof body.message === "string"
+                    ? body.message
+                    : `Request failed (${response.status})`;
+            throw new Error(message);
+        }
+    },
     executeWorkflow: (
         body: InferRequestType<
             typeof client.api.v1.workflow.execute.$post
