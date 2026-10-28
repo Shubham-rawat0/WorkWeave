@@ -3,7 +3,7 @@ const MAX_WORKFLOW_TITLE_LENGTH = 200;
 const MAX_WORKFLOW_NODES = 200;
 const MAX_WORKFLOW_EDGES = 500;
 const MAX_WORKFLOW_ACTIONS = 200;
-const MAX_ID_LENGTH = 100;
+export const MAX_ID_LENGTH = 100;
 export const EXECUTION_STREAM_TOKEN_TTL_SECONDS = 5 * 60;
 
 export const jsonValueSchema = z.json();
