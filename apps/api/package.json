@@ -24,7 +24,9 @@
   "dependencies": {
     "@WorkOrchestrator/prisma": "workspace:*",
     "@WorkOrchestrator/shared": "workspace:*",
+    "@ai-sdk/anthropic": "^4.0.91",
     "@ai-sdk/google": "^4.0.106",
+    "@ai-sdk/openai": "^4.0.104",
     "@hono/zod-validator": "^0.9.1",
     "ai": "^7.0.154",
     "bcrypt": "^6.0.0",

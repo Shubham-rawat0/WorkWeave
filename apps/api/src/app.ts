@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import { Prisma } from "@WorkOrchestrator/prisma";
-import { auth, credentials, webhook, workflow } from "./routes";
+import { agent, auth, credentials, webhook, workflow } from "./routes";
 import { authMiddleware } from "./middleware/auth";
 
 const WEB_APP_URL = process.env.WEB_APP_URL ?? "http://localhost:3000";
@@ -12,6 +12,7 @@ const apiV1 = new Hono()
   .route("/auth", auth)
   .route("/workflow", workflow)
   .route("/webhook", webhook)
+  .route("/agent", agent)
   .route("/credentials", credentials);
 
 export const app = new Hono()
@@ -84,6 +85,8 @@ export const app = new Hono()
   .use("/api/v1/workflow/*", authMiddleware)
   .use("/api/v1/credentials", authMiddleware)
   .use("/api/v1/credentials/*", authMiddleware)
+  .use("/api/v1/agent", authMiddleware)
+  .use("/api/v1/agent/*", authMiddleware)
   .route("/api/v1", apiV1);
 
 export type AppType = typeof app;
