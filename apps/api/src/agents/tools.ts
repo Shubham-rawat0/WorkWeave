@@ -1,7 +1,7 @@
 import { tool, type Tool } from "ai"
 import z from "zod"
 import { createWorkflow, deleteWorkflow, executeWorkflow, getWorkflow, listWorkflows, updateWorkflow } from "../services/workflowService"
-import { createWorkflowInputSchema, executeWorkflowInputSchema, MAX_ID_LENGTH, updateWorkflowInputSchema } from "../schemas/workflow";
+import { createWorkflowInputSchema, executeWorkflowInputSchema, updateWorkflowInputSchema, workflowIdInputSchema } from "../schemas/workflow";
 import { prisma } from "@WorkOrchestrator/prisma";
 import {
     getNodesByCategory,
@@ -10,6 +10,7 @@ import {
 } from "@WorkOrchestrator/shared";
 import { validateWorkflow } from "@WorkOrchestrator/shared/core";
 import { validateWorkflowGraph } from "../lib/workflow";
+import { HTTPException } from "hono/http-exception";
 
 interface WorkflowNode {
     id: string;
@@ -24,11 +25,61 @@ interface WorkflowEdge {
     targetHandle?: string | null;
 }
 
+const MAX_TOOL_ITEMS = 100;
+
+function safeToolError(error: unknown) {
+    if (error instanceof HTTPException) {
+        return { error: { code: `HTTP_${error.status}`, message: error.message } };
+    }
+    return { error: { code: "TOOL_FAILED", message: "The requested operation failed." } };
+}
+
+function workflowSummary(result: any) {
+    const workflow = result.workflow;
+    return {
+        workflow: {
+            id: workflow.id,
+            title: workflow.title,
+            createdAt: workflow.createdAt?.toISOString?.() ?? null,
+            updatedAt: workflow.updatedAt?.toISOString?.() ?? null,
+            nodes: Array.isArray(workflow.nodes) ? workflow.nodes.slice(0, MAX_TOOL_ITEMS).map((node: any) => ({
+                id: typeof node?.id === "string" ? node.id.slice(0, 100) : "",
+                type: typeof node?.type === "string" ? node.type.slice(0, 100) : "",
+                dataFields: node?.data && typeof node.data === "object" && !Array.isArray(node.data)
+                    ? Object.keys(node.data).slice(0, 50)
+                    : [],
+            })) : [],
+            edges: Array.isArray(workflow.edges) ? workflow.edges.slice(0, MAX_TOOL_ITEMS).map((edge: any) => ({
+                source: typeof edge?.source === "string" ? edge.source.slice(0, 100) : "",
+                target: typeof edge?.target === "string" ? edge.target.slice(0, 100) : "",
+            })) : [],
+            trigger: workflow.trigger ? {
+                id: workflow.trigger.id,
+                availableTriggerId: workflow.trigger.availableTriggerId,
+                name: workflow.trigger.type?.name,
+            } : null,
+            actions: Array.isArray(workflow.actions) ? workflow.actions.slice(0, MAX_TOOL_ITEMS).map((action: any) => ({
+                id: action.id,
+                availableActionId: action.availableActionId,
+                sortingOrder: action.sortingOrder,
+                name: action.type?.name,
+            })) : [],
+        },
+        webhookEndpointCount: Array.isArray(result.webhookEndpoints) ? result.webhookEndpoints.length : 0,
+    };
+}
+
+async function assertWorkflowOwned(userId: string, workflowId: string) {
+    const workflow = await prisma.workflow.findFirst({ where: { id: workflowId, userId }, select: { id: true } });
+    if (!workflow) throw new HTTPException(404, { message: "Workflow not found" });
+}
+
 const list_available_triggers = tool({
-    description: "list all the available and valid triggers that can be used in workflow",
+    description: "List up to 100 available trigger types for configuring a workflow. Returns only each trigger's ID and display name.",
     inputSchema: z.object({}),
     execute: async () => {
         return await prisma.availableTrigger.findMany({
+            orderBy: { name: "asc" },
             select: {
                 id: true,
                 name: true,
@@ -38,10 +89,11 @@ const list_available_triggers = tool({
 })
 
 const list_available_actions = tool({
-    description: "list all the available and valid actions that can be performed in workflow",
+    description: "List up to 100 available action types for configuring a workflow. Returns only each action's ID and display name.",
     inputSchema: z.object({}),
     execute: async () => {
         return await prisma.availableAction.findMany({
+            orderBy: { name: "asc" },
             select: {
                 id: true,
                 name: true,
@@ -51,7 +103,7 @@ const list_available_actions = tool({
 })
 
 const list_node_types = tool({
-    description: "get the node type and node definition",
+    description: "Get registered workflow node definitions, optionally filtered by category. Returns definitions suitable for building or validating workflow nodes.",
     inputSchema: z.object({
         category: z.enum(["triggers", "utilities", "integrations", "logic"]).optional()
     }),
@@ -65,7 +117,7 @@ const list_node_types = tool({
 
 
 const validate_workflow = tool({
-    description: "Validate a workflow's node configuration and graph structure before execution.",
+    description: "Validate a proposed workflow's node configuration and graph structure without saving or executing it. Returns validity and actionable validation issues.",
     inputSchema: z.object({
         nodes: z.array(z.object({
             id: z.string().trim().min(1),
@@ -102,7 +154,7 @@ const validate_workflow = tool({
         return {
             isValid: !hasErrors,
             canExecute: !hasErrors,
-            issues,
+            issues: issues.slice(0, MAX_TOOL_ITEMS),
         };
     }
 })
@@ -110,67 +162,79 @@ const validate_workflow = tool({
 export function agentWorkflowTools(userId: string): Record<string, Tool> {
     return {
         list_workflow: tool({
-            description: "List all workflows belonging to the current user.",
+            description: "List up to 100 workflows belonging to the authenticated user. Returns workflow IDs, titles, timestamps, graph counts, and latest run status; no workflow configuration or credentials.",
             inputSchema: z.object({}),
-            execute: async () => listWorkflows(userId),
+            execute: async () => {
+                try { return (await listWorkflows(userId)).slice(0, MAX_TOOL_ITEMS); }
+                catch (error) { return safeToolError(error); }
+            },
         }),
         get_workflow: tool({
-            description: "Get a particular workflow belonging to the current user.",
-            inputSchema: z.object({
-                workflowId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-            }),
-            execute: async ({ workflowId }) => getWorkflow(userId, workflowId),
+            description: "Get one workflow owned by the authenticated user. Returns its bounded graph and action/trigger labels, excluding raw metadata and secrets.",
+            inputSchema: workflowIdInputSchema,
+            execute: async ({ workflowId }) => {
+                try { return workflowSummary(await getWorkflow(userId, workflowId)); }
+                catch (error) { return safeToolError(error); }
+            },
         }),
         list_available_actions,
         list_available_triggers,
         list_node_types,
         validate_workflow,
         create_workflow: tool({
-            description: "Create a workflow for the current user with the provided configuration.",
+            description: "Create a workflow for the authenticated user after validating its configuration. Returns a bounded workflow summary and webhook endpoint count.",
             inputSchema: createWorkflowInputSchema,
-            execute: async (input) => createWorkflow(userId, input),
+            execute: async (input) => {
+                try { return workflowSummary(await createWorkflow(userId, input)); }
+                catch (error) { return safeToolError(error); }
+            },
         }),
         update_workflow: tool({
-            description: "Update a workflow belonging to the current user.",
+            description: "Update a workflow owned by the authenticated user after validating the supplied fields. Returns a bounded workflow summary.",
             inputSchema: updateWorkflowInputSchema,
-            execute: async (input) => updateWorkflow(userId, input),
+            execute: async (input) => {
+                try { return workflowSummary(await updateWorkflow(userId, input)); }
+                catch (error) { return safeToolError(error); }
+            },
         }),
         execute_workflow: tool({
-            description: "Queue an execution for a workflow belonging to the current user. Supports full manual runs, one node, or a configured cron/webhook trigger.",
+            description: "Queue a new execution for a workflow owned by the authenticated user. Each call creates a separate run; supports a full manual run, one node, or a configured cron/webhook trigger. Returns only the run ID, workflow ID, and status.",
             inputSchema: executeWorkflowInputSchema,
             execute: async (input) => {
-                const run = await executeWorkflow(userId, input);
-                return {
-                    runId: run.id,
-                    workflowId: input.workflowId,
-                    status: run.status,
-                };
+                try {
+                    await assertWorkflowOwned(userId, input.workflowId);
+                    const run = await executeWorkflow(userId, input);
+                    return { runId: run.id, workflowId: input.workflowId, status: run.status };
+                } catch (error) { return safeToolError(error); }
             },
         }),
         delete_workflow: tool({
-            description: "Delete a workflow belonging to the current user.",
-            inputSchema: z.object({
-                workflowId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-            }),
+            description: "Permanently delete a workflow owned by the authenticated user. Requires a separate server-side ownership check and returns a success result.",
+            inputSchema: workflowIdInputSchema,
             execute: async ({ workflowId }) => {
-                await deleteWorkflow(userId, workflowId);
-                return { success: true, workflowId };
+                try {
+                    await assertWorkflowOwned(userId, workflowId);
+                    await deleteWorkflow(userId, workflowId);
+                    return { success: true, workflowId };
+                } catch (error) { return safeToolError(error); }
             },
         }),
         list_credentials: tool({
-            description: "List the current user's saved credentials without returning secret keys.",
+            description: "List up to 100 saved credentials belonging to the authenticated user. Returns IDs, titles, platforms, and timestamps only; secret values are never returned.",
             inputSchema: z.object({}),
-            execute: async () => prisma.credentials.findMany({
-                where: { userId },
-                select: {
-                    id: true,
-                    title: true,
-                    platform: true,
-                    createdAt: true,
-                    updatedAt: true,
-                },
-                orderBy: { updatedAt: "desc" },
-            }),
+            execute: async () => {
+                try {
+                    const credentials = await prisma.credentials.findMany({
+                        where: { userId },
+                        take: MAX_TOOL_ITEMS,
+                        select: { id: true, title: true, platform: true, createdAt: true, updatedAt: true },
+                        orderBy: { updatedAt: "desc" },
+                    });
+                    return credentials.map(({ id, title, platform, createdAt, updatedAt }) => ({
+                        id, title, platform, createdAt: createdAt.toISOString(), updatedAt: updatedAt.toISOString(),
+                    }));
+                } catch (error) { return safeToolError(error); }
+            },
         }),
     };
 }
