@@ -79,6 +79,7 @@ const list_available_triggers = tool({
     inputSchema: z.object({}),
     execute: async () => {
         return await prisma.availableTrigger.findMany({
+            take: MAX_TOOL_ITEMS,
             orderBy: { name: "asc" },
             select: {
                 id: true,
@@ -93,6 +94,7 @@ const list_available_actions = tool({
     inputSchema: z.object({}),
     execute: async () => {
         return await prisma.availableAction.findMany({
+            take: MAX_TOOL_ITEMS,
             orderBy: { name: "asc" },
             select: {
                 id: true,

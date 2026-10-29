@@ -1,6 +1,18 @@
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { HTTPException } from "hono/http-exception";
+
+const SUPPORTED_AGENT_PLATFORMS = new Set([
+  "google",
+  "gemini",
+  "openai",
+  "anthropic",
+]);
+
+export function isSupportedAgentPlatform(provider: string): boolean {
+  return SUPPORTED_AGENT_PLATFORMS.has(provider.trim().toLowerCase());
+}
 
 export function getAgentModel(model: string, provider: string, apiKey: string) {
   const normalizedModel = model.trim();
@@ -8,7 +20,9 @@ export function getAgentModel(model: string, provider: string, apiKey: string) {
   const normalizedApiKey = apiKey.trim();
 
   if (!normalizedModel || !normalizedProvider || !normalizedApiKey) {
-    throw new Error("A valid model, provider, and API key are required.");
+    throw new HTTPException(400, {
+      message: "A valid model, provider, and API key are required.",
+    });
   }
 
   if (normalizedProvider === "google" || normalizedProvider === "gemini") {
@@ -20,5 +34,5 @@ export function getAgentModel(model: string, provider: string, apiKey: string) {
   if (normalizedProvider === "anthropic") {
     return createAnthropic({ apiKey: normalizedApiKey })(normalizedModel);
   }
-  throw new Error("Unsupported AI provider.");
+  throw new HTTPException(400, { message: "Unsupported AI provider." });
 }
