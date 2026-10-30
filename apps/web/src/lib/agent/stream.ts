@@ -77,9 +77,10 @@ export async function streamAgentChat({
     signal,
   });
 
+  const requestId = response.headers.get("x-request-id") ?? undefined;
+
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
-    const requestId = response.headers.get("x-request-id") ?? undefined;
     const error = new AgentChatError(
       getErrorMessage(payload, response.status),
       response.status,

@@ -20,6 +20,10 @@ import {
 } from "ai";
 import { WORKFLOW_AGENT_SYSTEM_PROMPT } from "../agents/prompt";
 import { logger } from "../lib/logger";
+import {
+  formatAgentErrorForClient,
+  getAgentErrorInfo,
+} from "../lib/agentErrors";
 
 function getLastUserPrompt(messages: readonly UIMessage[]): string {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -220,23 +224,26 @@ const app = new Hono<{ Variables: { user: User } }>()
           });
         },
         onError: ({ error }) => {
+          const info = getAgentErrorInfo(error, credential.platform);
           logger.error(
             "agent.chat",
             "Agent stream failed",
             error,
             {
               ...logContext(),
+              errorCode: info.code,
               durationMs: Math.round(performance.now() - startedAt),
             },
           );
           finishAgentRun("Failed", {
-            message: error instanceof Error ? error.message : "Agent run failed.",
+            errorCode: info.code,
+            message: info.message,
           });
         },
         onAbort: () => {
           logger.warn(
             "agent.chat",
-            "Agent stream aborted by client",
+            "Agent stream aborted (client disconnect or server idle timeout)",
             undefined,
             {
               ...logContext(),
@@ -252,6 +259,8 @@ const app = new Hono<{ Variables: { user: User } }>()
           stream: result.stream,
           tools,
           sendReasoning: false,
+          onError: (error) =>
+            formatAgentErrorForClient(error, credential.platform),
           ...(uiMessages ? { originalMessages: uiMessages } : {}),
           messageMetadata: ({ part }) => {
             if (part.type === "start") {

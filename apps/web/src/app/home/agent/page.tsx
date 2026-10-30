@@ -32,6 +32,10 @@ import {
   type AgentChatRequestBody,
   type AgentStreamChunk,
 } from "@/lib/agent/stream";
+import {
+  classifyAgentError,
+  parseAgentErrorText,
+} from "@WorkOrchestrator/shared/ai/errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,11 +60,14 @@ const PROVIDERS: Record<ProviderId, ProviderMeta> = {
     logo: "/logo/gemini.svg",
     platforms: ["google", "gemini"],
     models: [
-      "gemini-2.5-pro",
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-2.0-flash",
-      "gemini-1.5-pro",
+      "models/gemini-3.1-pro-preview",
+      "models/gemini-3-flash-preview",
+      "models/gemini-3.6-flash",
+      "models/gemini-3.5-flash",
+      "models/gemini-3.1-flash-lite",
+      "models/gemini-2.5-pro",
+      "models/gemini-2.5-flash",
+      "models/gemini-2.5-flash-lite",
     ],
   },
   openai: {
@@ -69,12 +76,17 @@ const PROVIDERS: Record<ProviderId, ProviderMeta> = {
     logo: "/logo/openai.svg",
     platforms: ["openai"],
     models: [
+      "gpt-5.2",
+      "gpt-5.2-pro",
+      "gpt-5.2-chat-latest",
+      "gpt-5.1",
+      "gpt-5.1-codex",
       "gpt-5",
       "gpt-5-mini",
       "gpt-4.1",
       "gpt-4.1-mini",
       "gpt-4o",
-      "gpt-4o-mini",
+      "o3",
     ],
   },
   anthropic: {
@@ -83,10 +95,16 @@ const PROVIDERS: Record<ProviderId, ProviderMeta> = {
     logo: "/logo/anthropic.svg",
     platforms: ["anthropic"],
     models: [
-      "claude-sonnet-4-5",
-      "claude-opus-4-1",
-      "claude-3-7-sonnet-latest",
-      "claude-3-5-haiku-latest",
+      "claude-opus-5-5",
+      "claude-sonnet-5-5",
+      "claude-haiku-5-5",
+      "claude-opus-5",
+      "claude-sonnet-5",
+      "claude-opus-4-8",
+      "claude-opus-4-7",
+      "claude-opus-4-6",
+      "claude-sonnet-4-6",
+      "claude-haiku-4-5",
     ],
   },
 };
@@ -101,7 +119,13 @@ type ToolPart = {
   state: "streaming" | "complete" | "error";
   errorText?: string;
 };
-type AgentPart = TextPart | ToolPart;
+type AgentErrorPart = {
+  type: "error";
+  id: string;
+  errorText: string;
+  state: "error";
+};
+type AgentPart = TextPart | ToolPart | AgentErrorPart;
 type AgentMessage = {
   id: string;
   role: "user" | "assistant";
@@ -207,7 +231,9 @@ function describeEvent(chunk: AgentStreamChunk): string {
     return readString(chunk.errorText) ?? "Tool failed.";
   }
   if (type === "error") {
-    return readString(chunk.errorText) ?? "Agent error.";
+    const text = readString(chunk.errorText) ?? "Agent error.";
+    const info = parseAgentErrorText(text);
+    return info ? `${info.title}: ${info.message}` : text;
   }
   if (type === "finish") {
     const reason = readString(chunk.finishReason);
@@ -317,6 +343,23 @@ function ToolCall({ part }: { part: ToolPart }) {
   );
 }
 
+function AgentErrorPartView({ part }: { part: AgentErrorPart }) {
+  return (
+    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-300">
+          <AlertCircle className="size-3.5" />
+          Agent error
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.12em] text-[#7c7a72]">
+          failed
+        </span>
+      </div>
+      <p className="mt-2 break-words text-sm text-red-200">{part.errorText}</p>
+    </div>
+  );
+}
+
 function MessageBubble({ message }: { message: AgentMessage }) {
   const isUser = message.role === "user";
   return (
@@ -362,6 +405,11 @@ function MessageBubble({ message }: { message: AgentMessage }) {
                 {part.text}
               </div>
             ) : null
+          ) : part.type === "error" ? (
+            <AgentErrorPartView
+              key={`${part.type}-${part.id}`}
+              part={part}
+            />
           ) : (
             <ToolCall key={`${part.type}-${part.id}`} part={part} />
           ),
@@ -455,7 +503,6 @@ export default function AgentPage() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [runMeta, setRunMeta] = useState<RunMeta | null>(null);
 
@@ -676,12 +723,25 @@ export default function AgentPage() {
           return;
         }
         case "error": {
+          if (abortRef.current?.signal.aborted) return;
           const errorText =
             readString(chunk.errorText) ?? "The agent run failed.";
+          const info =
+            parseAgentErrorText(errorText) ??
+            classifyAgentError({ message: errorText });
           logAgentUiError("Agent stream emitted an error event", errorText, {
             agentRunId: agentRunIdRef.current,
+            errorCode: info.code,
           });
-          setError(errorText);
+          updateAssistant(assistantId, (parts) => [
+            ...parts.filter((part) => part.type !== "error"),
+            {
+              type: "error",
+              id: nextId("error"),
+              errorText: info.message,
+              state: "error",
+            },
+          ]);
           return;
         }
         default:
@@ -711,7 +771,6 @@ export default function AgentPage() {
     setMessages((current) => [...current, userMessage, assistantMessage]);
     setInput("");
     setEvents([]);
-    setError(null);
     setNotice(null);
     setRunMeta(null);
     setIsAborting(false);
@@ -741,6 +800,20 @@ export default function AgentPage() {
         setNotice("Request stopped. The agent will not continue generating.");
         return;
       }
+      const info =
+        err instanceof AgentChatError
+          ? classifyAgentError({
+              message: err.message,
+              statusCode: err.status,
+              provider,
+            })
+          : classifyAgentError({
+              message:
+                err instanceof Error
+                  ? err.message
+                  : "The agent request failed.",
+              provider,
+            });
       logAgentUiError("Agent request failed", err, {
         agentRunId: agentRunIdRef.current,
         provider,
@@ -749,8 +822,28 @@ export default function AgentPage() {
         messageCount: history.length,
         status: err instanceof AgentChatError ? err.status : undefined,
         requestId: err instanceof AgentChatError ? err.requestId : undefined,
+        errorCode: info.code,
       });
-      setError(err instanceof Error ? err.message : "The agent request failed.");
+      setEvents((current) => [
+        ...current.slice(-499),
+        {
+          id: nextId("event"),
+          receivedAt: Date.now(),
+          chunk: {
+            type: "error",
+            errorText: info.message,
+          },
+        },
+      ]);
+      updateAssistant(assistantMessage.id, (parts) => [
+        ...parts.filter((part) => part.type !== "error"),
+        {
+          type: "error",
+          id: nextId("error"),
+          errorText: info.message,
+          state: "error",
+        },
+      ]);
     } finally {
       setIsStreaming(false);
       setIsAborting(false);
@@ -790,7 +883,6 @@ export default function AgentPage() {
     if (isStreaming) return;
     setMessages([]);
     setEvents([]);
-    setError(null);
     setNotice(null);
     setRunMeta(null);
     agentRunIdRef.current = null;
@@ -911,25 +1003,7 @@ export default function AgentPage() {
           </div>
         </section>
 
-        {error && (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span className="min-w-0 flex-1 break-words">{error}</span>
-            <button
-              type="button"
-              onClick={() => setError(null)}
-              aria-label="Dismiss error"
-              className="shrink-0 rounded p-0.5 text-red-300/70 transition-colors hover:bg-red-500/20 hover:text-red-200"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        )}
-
-        {notice && !error && (
+        {notice && (
           <div
             role="status"
             className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"

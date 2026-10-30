@@ -379,6 +379,14 @@ function WorkflowsSection({ searchQuery }: { searchQuery: string }) {
               Choose a new name for this workflow.
             </DialogDescription>
           </DialogHeader>
+          {renameTarget && (
+            <div className="space-y-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+              <p className="text-xs font-medium text-[#87867c]">Workflow ID</p>
+              <p className="select-all break-all font-mono text-xs text-[#c9c9c5]">
+                {renameTarget.id}
+              </p>
+            </div>
+          )}
           <form
             onSubmit={(event) => {
               event.preventDefault();

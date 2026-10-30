@@ -20,9 +20,15 @@ const PROVIDER_CONFIG: Record<
   openai: {
     name: "OpenAI",
     models: [
+      { value: "gpt-5.2", label: "GPT-5.2" },
+      { value: "gpt-5.2-pro", label: "GPT-5.2 Pro" },
+      { value: "gpt-5.2-chat-latest", label: "GPT-5.2 Chat" },
+      { value: "gpt-5.1", label: "GPT-5.1" },
+      { value: "gpt-5.1-codex", label: "GPT-5.1 Codex" },
+      { value: "gpt-5", label: "GPT-5" },
+      { value: "gpt-5-mini", label: "GPT-5 mini" },
       { value: "gpt-4.1", label: "GPT-4.1" },
       { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
-      { value: "gpt-4.1-nano", label: "GPT-4.1 nano" },
       { value: "gpt-4o", label: "GPT-4o" },
       { value: "o3", label: "o3" },
     ],
@@ -30,19 +36,41 @@ const PROVIDER_CONFIG: Record<
   gemini: {
     name: "Gemini",
     models: [
-      { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-      { value: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
-      { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+      {
+        value: "models/gemini-3.1-pro-preview",
+        label: "Gemini 3.1 Pro Preview",
+      },
+      {
+        value: "models/gemini-3-flash-preview",
+        label: "Gemini 3 Flash Preview",
+      },
+      { value: "models/gemini-3.6-flash", label: "Gemini 3.6 Flash" },
+      { value: "models/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+      {
+        value: "models/gemini-3.1-flash-lite",
+        label: "Gemini 3.1 Flash-Lite",
+      },
+      { value: "models/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+      { value: "models/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+      {
+        value: "models/gemini-2.5-flash-lite",
+        label: "Gemini 2.5 Flash-Lite",
+      },
     ],
   },
   anthropic: {
     name: "Anthropic",
     models: [
+      { value: "claude-opus-5-5", label: "Claude Opus 5.5" },
+      { value: "claude-sonnet-5-5", label: "Claude Sonnet 5.5" },
+      { value: "claude-haiku-5-5", label: "Claude Haiku 5.5" },
+      { value: "claude-opus-5", label: "Claude Opus 5" },
+      { value: "claude-sonnet-5", label: "Claude Sonnet 5" },
+      { value: "claude-opus-4-8", label: "Claude Opus 4.8" },
+      { value: "claude-opus-4-7", label: "Claude Opus 4.7" },
       { value: "claude-opus-4-6", label: "Claude Opus 4.6" },
-      { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+      { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
       { value: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
-      { value: "claude-sonnet-4-0", label: "Claude Sonnet 4" },
-      { value: "claude-opus-4-0", label: "Claude Opus 4" },
     ],
   },
 };
@@ -77,7 +105,7 @@ export function AIConfigForm({
   const [credentialId, setCredentialId] = useState(data.credentialId || "");
   const [model, setModel] = useState(
     provider === "gemini" && data.model === "gemini-2.5-flash"
-      ? "gemini-3.8-flash"
+      ? "models/gemini-3.1-pro-preview"
       : data.model || "",
   );
   const [systemPrompt, setSystemPrompt] = useState(data.systemPrompt || "");

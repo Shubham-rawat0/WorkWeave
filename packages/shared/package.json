@@ -45,6 +45,10 @@
     "./core": {
       "types": "./src/core/validation.ts",
       "default": "./src/core/validation.ts"
+    },
+    "./ai/errors": {
+      "types": "./src/ai/errors.ts",
+      "default": "./src/ai/errors.ts"
     }
   },
   "dependencies": {
