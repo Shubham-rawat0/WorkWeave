@@ -20,6 +20,7 @@ import {
 function getRouteTitle(pathname: string): string | null {
   if (pathname.startsWith("/home/executions")) return "Executions";
   if (pathname.startsWith("/home/credentials")) return "Credentials";
+  if (pathname.startsWith("/home/agent")) return "AI Agent";
   if (pathname.startsWith("/home/account")) return "Account";
   if (pathname.startsWith("/home/workflows")) return "Workflows";
   return null;

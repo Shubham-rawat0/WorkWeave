@@ -19,6 +19,7 @@ import {
   type UIMessage,
 } from "ai";
 import { WORKFLOW_AGENT_SYSTEM_PROMPT } from "../agents/prompt";
+import { logger } from "../lib/logger";
 
 function getLastUserPrompt(messages: readonly UIMessage[]): string {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -49,27 +50,64 @@ const app = new Hono<{ Variables: { user: User } }>()
     async (c) => {
       const input = c.req.valid("json");
       const userId = c.get("user").id;
+      const requestId = crypto.randomUUID();
+
+      let agentRunId: string | null = null;
+      const logContext = () => ({
+        requestId,
+        userId,
+        model: input.model,
+        credentialId: input.credentialId,
+        workflowId: input.workflowId ?? null,
+        agentRunId,
+      });
+
+      c.header("X-Request-Id", requestId);
 
       const credential = await prisma.credentials.findFirst({
         where: { id: input.credentialId, userId },
         select: { keys: true, platform: true },
       });
       if (!credential) {
+        logger.warn("agent.chat", "Credential not found", undefined, logContext());
         throw new HTTPException(404, { message: "Credential not found." });
       }
       if (!isSupportedAgentPlatform(credential.platform)) {
+        logger.warn(
+          "agent.chat",
+          "Credential uses an unsupported provider",
+          undefined,
+          { ...logContext(), platform: credential.platform },
+        );
         throw new HTTPException(400, {
           message: "The selected credential is not a supported AI provider.",
         });
       }
 
-      const keys = decryptJson<Record<string, unknown>>(
-        credential.keys as string,
-      );
+      let keys: Record<string, unknown>;
+      try {
+        keys = decryptJson<Record<string, unknown>>(credential.keys as string);
+      } catch (error) {
+        logger.error(
+          "agent.chat",
+          "Failed to decrypt credential",
+          error,
+          { ...logContext(), platform: credential.platform },
+        );
+        throw new HTTPException(500, {
+          message: "Failed to read the selected credential.",
+        });
+      }
 
       const normalizedApiKey =
         typeof keys.apiKey === "string" ? keys.apiKey.trim() : "";
       if (!normalizedApiKey) {
+        logger.warn(
+          "agent.chat",
+          "Credential has no API key",
+          undefined,
+          { ...logContext(), platform: credential.platform },
+        );
         throw new HTTPException(400, {
           message: "The selected credential has no API key.",
         });
@@ -82,6 +120,7 @@ const app = new Hono<{ Variables: { user: User } }>()
           select: { id: true },
         });
         if (!workflow) {
+          logger.warn("agent.chat", "Workflow not found", undefined, logContext());
           throw new HTTPException(404, { message: "Workflow not found." });
         }
         workflowContext = `Selected workflow ID: ${workflow.id}`;
@@ -100,6 +139,12 @@ const app = new Hono<{ Variables: { user: User } }>()
           modelMessages = await convertToModelMessages(uiMessages);
         } catch (error) {
           if (error instanceof HTTPException) throw error;
+          logger.warn(
+            "agent.chat",
+            "Invalid chat message history",
+            error,
+            logContext(),
+          );
           throw new HTTPException(400, { message: "Invalid chat messages." });
         }
       }
@@ -114,7 +159,6 @@ const app = new Hono<{ Variables: { user: User } }>()
       const persistencePrompt =
         input.prompt ?? getLastUserPrompt(uiMessages ?? []);
 
-      let agentRunId: string | null = null;
       try {
         const agentRun = await prisma.workflowAgent.create({
           data: {
@@ -127,7 +171,12 @@ const app = new Hono<{ Variables: { user: User } }>()
         });
         agentRunId = agentRun.id;
       } catch (error) {
-        console.error("Failed to create workflow agent record", error);
+        logger.error(
+          "agent.chat",
+          "Failed to create workflow agent record",
+          error,
+          logContext(),
+        );
       }
 
       const finishAgentRun = (status: "Completed" | "Failed", result: unknown) => {
@@ -139,7 +188,12 @@ const app = new Hono<{ Variables: { user: User } }>()
             data: { status, result: toJsonValue(result) },
           })
           .catch((error) => {
-            console.error("Failed to update workflow agent record", error);
+            logger.error(
+              "agent.chat",
+              "Failed to update workflow agent record",
+              error,
+              logContext(),
+            );
           });
       };
 
@@ -154,6 +208,7 @@ const app = new Hono<{ Variables: { user: User } }>()
         abortSignal: c.req.raw.signal,
         onEnd: (event) => {
           finishAgentRun("Completed", {
+            requestId,
             text: event.text,
             finishReason: event.finishReason,
             usage: {
@@ -165,16 +220,34 @@ const app = new Hono<{ Variables: { user: User } }>()
           });
         },
         onError: ({ error }) => {
+          logger.error(
+            "agent.chat",
+            "Agent stream failed",
+            error,
+            {
+              ...logContext(),
+              durationMs: Math.round(performance.now() - startedAt),
+            },
+          );
           finishAgentRun("Failed", {
             message: error instanceof Error ? error.message : "Agent run failed.",
           });
         },
         onAbort: () => {
+          logger.warn(
+            "agent.chat",
+            "Agent stream aborted by client",
+            undefined,
+            {
+              ...logContext(),
+              durationMs: Math.round(performance.now() - startedAt),
+            },
+          );
           finishAgentRun("Failed", { message: "Agent run aborted." });
         },
       });
 
-      return createUIMessageStreamResponse({
+      const response = createUIMessageStreamResponse({
         stream: toUIMessageStream({
           stream: result.stream,
           tools,
@@ -200,6 +273,9 @@ const app = new Hono<{ Variables: { user: User } }>()
           },
         }),
       });
+
+      response.headers.set("X-Request-Id", requestId);
+      return response;
     },
   );
 

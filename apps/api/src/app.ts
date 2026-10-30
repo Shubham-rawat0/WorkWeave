@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { Prisma } from "@WorkOrchestrator/prisma";
 import { agent, auth, credentials, webhook, workflow } from "./routes";
 import { authMiddleware } from "./middleware/auth";
+import { logger } from "./lib/logger";
 
 const WEB_APP_URL = process.env.WEB_APP_URL ?? "http://localhost:3000";
 
@@ -73,7 +74,11 @@ export const app = new Hono()
       );
     }
 
-    console.error(err);
+    logger.error("http.request", "Unhandled request error", err, {
+      method: c.req.method,
+      path: c.req.path,
+      requestId: c.res.headers.get("X-Request-Id"),
+    });
     return c.json(
       {
         message: "Internal server error",
