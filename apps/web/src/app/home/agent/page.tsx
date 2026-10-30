@@ -12,16 +12,15 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   AlertCircle,
-  BotMessageSquareIcon,
-  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Cpu,
   Eraser,
   KeyRound,
   Loader2,
   Send,
+  SlidersHorizontal,
   Square,
-  Terminal,
-  UserRound,
   Wrench,
   X,
 } from "lucide-react";
@@ -37,7 +36,6 @@ import {
   parseAgentErrorText,
 } from "@WorkOrchestrator/shared/ai/errors";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -133,19 +131,10 @@ type AgentMessage = {
 };
 type AgentEvent = {
   id: string;
+  assistantId: string;
   receivedAt: number;
   chunk: AgentStreamChunk;
 };
-type RunMeta = {
-  agentRunId?: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
-  durationMs?: number;
-};
-
-const PRIMARY_BUTTON =
-  "bg-[#F04D26] text-white hover:bg-[#F04D26]/90 disabled:opacity-60";
 const FIELD_CLASS =
   "h-10 w-full rounded-lg border border-[#333333] bg-[#151515] px-3 text-sm text-white outline-none transition-colors placeholder:text-[#6b6b68] focus-visible:border-[#F04D26]/70 focus-visible:ring-1 focus-visible:ring-[#F04D26]/40 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -161,12 +150,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function readNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
 }
 
 function stringify(value: unknown): string {
@@ -186,7 +169,9 @@ function messageToHistoryPart(message: AgentMessage): string {
     .trim();
 }
 
-function buildHistory(messages: AgentMessage[]): AgentChatRequestBody["messages"] {
+function buildHistory(
+  messages: AgentMessage[],
+): AgentChatRequestBody["messages"] {
   return messages
     .map((message) => ({
       id: message.id,
@@ -280,66 +265,63 @@ function logAgentUiError(
   });
 }
 
-function ProviderButton({
-  meta,
-  active,
-  disabled,
-  onClick,
-}: {
-  meta: ProviderMeta;
-  active: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
+function ToolCall({ part, disabled }: { part: ToolPart; disabled: boolean }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      disabled={disabled}
-      className={cn(
-        "flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
-        active
-          ? "border-[#F04D26]/60 bg-[#F04D26]/10 text-white"
-          : "border-[#333333] bg-[#1a1a1a] text-[#a4a29a] hover:border-[#4a4a4a] hover:text-white",
-      )}
-    >
-      <Image src={meta.logo} alt="" width={18} height={18} unoptimized />
-      {meta.label}
-    </button>
-  );
-}
-
-function ToolCall({ part }: { part: ToolPart }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-black/25 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-200">
-          <Wrench className="size-3.5" />
+    <details className="group">
+      <summary
+        onClick={(event) => disabled && event.preventDefault()}
+        aria-disabled={disabled}
+        className={cn(
+          "flex list-none items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-white/[0.03] [&::-webkit-details-marker]:hidden",
+          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+        )}
+      >
+        <ChevronRight className="size-3.5 shrink-0 text-[#87867c] transition-transform group-open:rotate-90" />
+        <Wrench className="size-3.5 shrink-0 text-amber-300" />
+        <span className="min-w-0 flex-1 truncate font-medium text-[#e8e6e1]">
           {part.name}
         </span>
-        <span className="text-[10px] uppercase tracking-[0.12em] text-[#7c7a72]">
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-wider",
+            part.state === "error"
+              ? "text-red-300"
+              : part.state === "streaming"
+                ? "text-sky-300"
+                : "text-[#7c7a72]",
+          )}
+        >
           {part.state === "streaming"
             ? "running"
             : part.state === "error"
               ? "failed"
               : "done"}
         </span>
-      </div>
+      </summary>
       {part.input !== undefined && (
-        <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-[#b9b7af]">
-          {stringify(part.input)}
-        </pre>
+        <>
+          <p className="mt-2 border-t border-white/[0.06] pt-2 font-mono text-[10px] uppercase tracking-wider text-[#6f6d66]">
+            Input
+          </p>
+          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-[#b9b7af]">
+            {stringify(part.input)}
+          </pre>
+        </>
       )}
       {part.output !== undefined && (
-        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words border-t border-white/[0.06] pt-2 text-[11px] leading-relaxed text-emerald-200/80">
-          {stringify(part.output)}
-        </pre>
+        <>
+          <p className="mt-2 border-t border-white/[0.06] pt-2 font-mono text-[10px] uppercase tracking-wider text-[#6f6d66]">
+            Output
+          </p>
+          <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-emerald-200/80">
+            {stringify(part.output)}
+          </pre>
+        </>
       )}
       {part.errorText && (
-        <p className="mt-2 text-[11px] text-red-300">{part.errorText}</p>
+        <p className="mt-2 text-xs text-red-300">{part.errorText}</p>
       )}
-    </div>
+    </details>
   );
 }
 
@@ -360,28 +342,100 @@ function AgentErrorPartView({ part }: { part: AgentErrorPart }) {
   );
 }
 
-function MessageBubble({ message }: { message: AgentMessage }) {
-  const isUser = message.role === "user";
+function EventTrace({
+  events,
+  disabled,
+}: {
+  events: AgentEvent[];
+  disabled: boolean;
+}) {
+  if (events.length === 0) return null;
+  const hasError = events.some((event) => event.chunk.type.includes("error"));
+  const toolCount = events.filter(
+    (event) => event.chunk.type === "tool-input-start",
+  ).length;
+
   return (
-    <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
-      <span
+    <details className="group text-xs">
+      <summary
+        onClick={(event) => disabled && event.preventDefault()}
+        aria-disabled={disabled}
         className={cn(
-          "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ring-1",
-          isUser
-            ? "bg-white/10 text-[#c9c7bf] ring-white/15"
-            : "bg-[#F04D26]/15 text-[#F04D26] ring-[#F04D26]/30",
+          "flex list-none items-center gap-2 rounded-lg px-3 py-2.5 text-[#b9b7af] transition-colors hover:bg-white/[0.03] [&::-webkit-details-marker]:hidden",
+          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
         )}
       >
-        {isUser ? (
-          <UserRound className="size-4" />
-        ) : (
-          <BotMessageSquareIcon className="size-4" />
-        )}
-      </span>
+        <ChevronRight className="size-3.5 shrink-0 text-[#87867c] transition-transform group-open:rotate-90" />
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            hasError ? "bg-red-400" : "bg-emerald-400",
+          )}
+        />
+        <span className="font-medium">Agent activity</span>
+        <span className="text-[#6f6d66]">
+          {toolCount} tool {toolCount === 1 ? "call" : "calls"}
+        </span>
+        <span className="ml-auto font-mono text-[10px] text-[#6f6d66]">
+          {events.length} events
+        </span>
+      </summary>
+      <ol className="mt-1 max-h-64 space-y-0.5 overflow-y-auto py-1">
+        {events.map((event) => (
+          <li key={event.id}>
+            <details className="group">
+              <summary
+                onClick={(clickEvent) =>
+                  disabled && clickEvent.preventDefault()
+                }
+                aria-disabled={disabled}
+                className={cn(
+                  "flex list-none items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-white/[0.03] [&::-webkit-details-marker]:hidden",
+                  disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                )}
+              >
+                <ChevronRight className="size-3 shrink-0 text-[#6f6d66] transition-transform group-open:rotate-90" />
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate font-mono text-[10px] font-medium",
+                    eventTone(event.chunk.type),
+                  )}
+                >
+                  {event.chunk.type}
+                </span>
+                <span className="shrink-0 font-mono text-[10px] tabular-nums text-[#6f6d66]">
+                  {formatTime(event.receivedAt)}
+                </span>
+              </summary>
+              <p className="ml-8 whitespace-pre-wrap break-words border-l border-white/10 py-2 pl-3 font-mono text-[10px] leading-relaxed text-[#a4a29a]">
+                {describeEvent(event.chunk)}
+              </p>
+            </details>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+function MessageBubble({
+  message,
+  events = [],
+  disabled = false,
+}: {
+  message: AgentMessage;
+  events?: AgentEvent[];
+  disabled?: boolean;
+}) {
+  const isUser = message.role === "user";
+  return (
+    <div className="flex">
       <div
         className={cn(
-          "min-w-0 max-w-[85%] space-y-2",
-          isUser && "flex flex-col items-end",
+          "min-w-0 space-y-2",
+          isUser
+            ? "ml-auto flex max-w-[85%] flex-col items-end"
+            : "w-full",
         )}
       >
         {message.parts.length === 0 && !isUser && (
@@ -396,98 +450,28 @@ function MessageBubble({ message }: { message: AgentMessage }) {
               <div
                 key={`${part.type}-${part.id}`}
                 className={cn(
-                  "whitespace-pre-wrap break-words rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
+                  "whitespace-pre-wrap break-words text-sm leading-relaxed",
                   isUser
-                    ? "bg-[#F04D26] text-white"
-                    : "border border-white/10 bg-[#1d1d1d] text-[#e8e6e1]",
+                    ? "rounded-2xl bg-[#262626] px-4 py-3 text-white"
+                    : "text-[#e8e6e1]",
                 )}
               >
                 {part.text}
               </div>
             ) : null
           ) : part.type === "error" ? (
-            <AgentErrorPartView
+            <AgentErrorPartView key={`${part.type}-${part.id}`} part={part} />
+          ) : (
+            <ToolCall
               key={`${part.type}-${part.id}`}
               part={part}
+              disabled={disabled}
             />
-          ) : (
-            <ToolCall key={`${part.type}-${part.id}`} part={part} />
           ),
         )}
+        {!isUser && <EventTrace events={events} disabled={disabled} />}
       </div>
     </div>
-  );
-}
-
-function EventsPanel({
-  events,
-  onClear,
-}: {
-  events: AgentEvent[];
-  onClear: () => void;
-}) {
-  const listRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const element = listRef.current;
-    if (element) element.scrollTop = element.scrollHeight;
-  }, [events]);
-
-  return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a]">
-      <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-white/10 px-4">
-        <div className="flex items-center gap-2">
-          <Terminal className="size-4 text-[#F04D26]" />
-          <h2 className="text-sm font-medium text-white">Events</h2>
-          <span className="rounded-full bg-white/10 px-1.5 text-[10px] text-[#b0aea6]">
-            {events.length}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={onClear}
-          disabled={events.length === 0}
-          aria-label="Clear events"
-          className="flex size-7 items-center justify-center rounded-md text-[#87867c] transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
-        >
-          <Eraser className="size-3.5" />
-        </button>
-      </div>
-
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-2">
-        {events.length === 0 ? (
-          <p className="px-2 py-6 text-center text-xs text-[#6f6d66]">
-            Stream events from the agent will appear here.
-          </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {events.map((event) => (
-              <li
-                key={event.id}
-                className="rounded-md border border-white/[0.06] bg-black/20 px-2.5 py-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={cn(
-                      "truncate font-mono text-[10px] font-medium",
-                      eventTone(event.chunk.type),
-                    )}
-                  >
-                    {event.chunk.type}
-                  </span>
-                  <span className="shrink-0 text-[10px] tabular-nums text-[#6f6d66]">
-                    {formatTime(event.receivedAt)}
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-4 whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-[#a4a29a]">
-                  {describeEvent(event.chunk)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </aside>
   );
 }
 
@@ -500,11 +484,11 @@ export default function AgentPage() {
   const [model, setModel] = useState(PROVIDERS.google.models[0] ?? "");
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [events, setEvents] = useState<AgentEvent[]>([]);
+  const [configOpen, setConfigOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAborting, setIsAborting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [runMeta, setRunMeta] = useState<RunMeta | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const agentRunIdRef = useRef<string | null>(null);
@@ -540,7 +524,9 @@ export default function AgentPage() {
       })
       .catch((err: unknown) => {
         if (!isCurrent) return;
-        logAgentUiError("Failed to load credentials", err, { scope: "credentials" });
+        logAgentUiError("Failed to load credentials", err, {
+          scope: "credentials",
+        });
         setCredentialsError(
           err instanceof Error ? err.message : "Failed to load credentials.",
         );
@@ -575,13 +561,10 @@ export default function AgentPage() {
   useEffect(() => {
     const element = messageListRef.current;
     if (element) element.scrollTop = element.scrollHeight;
-  }, [messages, isStreaming]);
+  }, [messages, events, isStreaming]);
 
   const updateAssistant = useCallback(
-    (
-      assistantId: string,
-      updater: (parts: AgentPart[]) => AgentPart[],
-    ) => {
+    (assistantId: string, updater: (parts: AgentPart[]) => AgentPart[]) => {
       setMessages((current) =>
         current.map((message) =>
           message.id === assistantId
@@ -595,17 +578,24 @@ export default function AgentPage() {
 
   const handleChunk = useCallback(
     (assistantId: string, chunk: AgentStreamChunk) => {
-      setEvents((current) => [
-        ...current.slice(-499),
-        { id: nextId("event"), receivedAt: Date.now(), chunk },
-      ]);
+      if (
+        !chunk.type.startsWith("text-") &&
+        !chunk.type.startsWith("reasoning-")
+      ) {
+        setEvents((current) => [
+          ...current.slice(-199),
+          { id: nextId("event"), assistantId, receivedAt: Date.now(), chunk },
+        ]);
+      }
 
       switch (chunk.type) {
         case "start": {
           const metadata = isRecord(chunk.messageMetadata)
             ? chunk.messageMetadata
             : undefined;
-          const agentRunId = metadata ? readString(metadata.agentRunId) : undefined;
+          const agentRunId = metadata
+            ? readString(metadata.agentRunId)
+            : undefined;
           if (agentRunId) agentRunIdRef.current = agentRunId;
           return;
         }
@@ -619,10 +609,7 @@ export default function AgentPage() {
               (part) => part.type === "text" && part.id === partId,
             );
             if (index === -1) {
-              return [
-                ...parts,
-                { type: "text", id: partId, text: delta },
-              ];
+              return [...parts, { type: "text", id: partId, text: delta }];
             }
             return parts.map((part, partIndex) =>
               partIndex === index && part.type === "text"
@@ -633,13 +620,10 @@ export default function AgentPage() {
           return;
         }
         case "tool-input-start": {
-          const toolCallId =
-            readString(chunk.toolCallId) ?? nextId("tool");
+          const toolCallId = readString(chunk.toolCallId) ?? nextId("tool");
           const name = readString(chunk.toolName) ?? "tool";
           updateAssistant(assistantId, (parts) =>
-            parts.some(
-              (part) => part.type === "tool" && part.id === toolCallId,
-            )
+            parts.some((part) => part.type === "tool" && part.id === toolCallId)
               ? parts
               : [
                   ...parts,
@@ -706,20 +690,10 @@ export default function AgentPage() {
           const metadata = isRecord(chunk.messageMetadata)
             ? chunk.messageMetadata
             : undefined;
-          const usage = metadata && isRecord(metadata.tokenUsage)
-            ? metadata.tokenUsage
-            : undefined;
           const agentRunId = metadata
             ? readString(metadata.agentRunId)
             : undefined;
           if (agentRunId) agentRunIdRef.current = agentRunId;
-          setRunMeta({
-            agentRunId,
-            inputTokens: usage ? readNumber(usage.inputTokens) : undefined,
-            outputTokens: usage ? readNumber(usage.outputTokens) : undefined,
-            totalTokens: usage ? readNumber(usage.totalTokens) : undefined,
-            durationMs: metadata ? readNumber(metadata.durationMs) : undefined,
-          });
           return;
         }
         case "error": {
@@ -770,9 +744,7 @@ export default function AgentPage() {
     agentRunIdRef.current = null;
     setMessages((current) => [...current, userMessage, assistantMessage]);
     setInput("");
-    setEvents([]);
     setNotice(null);
-    setRunMeta(null);
     setIsAborting(false);
     setIsStreaming(true);
 
@@ -828,6 +800,7 @@ export default function AgentPage() {
         ...current.slice(-499),
         {
           id: nextId("event"),
+          assistantId: assistantMessage.id,
           receivedAt: Date.now(),
           chunk: {
             type: "error",
@@ -884,7 +857,6 @@ export default function AgentPage() {
     setMessages([]);
     setEvents([]);
     setNotice(null);
-    setRunMeta(null);
     agentRunIdRef.current = null;
   }
 
@@ -893,20 +865,10 @@ export default function AgentPage() {
     Boolean(credentialId) &&
     Boolean(model.trim()) &&
     !isStreaming;
-  const datalistId = `agent-models-${provider}`;
-
   return (
     <div className="p-4 md:p-6">
-      <div className="mx-auto w-full max-w-[1400px] space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="font-display text-2xl tracking-tight text-white">
-              AI Agent
-            </h1>
-            <p className="mt-1 text-sm text-[#87867c]">
-              Chat with your workflow assistant and inspect every stream event.
-            </p>
-          </div>
+      <div className="mx-auto flex h-[calc(100svh-7rem)] w-full max-w-4xl flex-col gap-4">
+        <div className="flex justify-end">
           <Button
             type="button"
             variant="outline"
@@ -918,90 +880,6 @@ export default function AgentPage() {
             Clear chat
           </Button>
         </div>
-
-        <section className="rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
-          <div className="grid gap-4 lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="space-y-2">
-              <Label className="text-[#87867c]">Provider</Label>
-              <div className="flex flex-wrap gap-2">
-                {PROVIDER_ORDER.map((id) => (
-                  <ProviderButton
-                    key={id}
-                    meta={PROVIDERS[id]}
-                    active={provider === id}
-                    disabled={isStreaming}
-                    onClick={() => setProvider(id)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="agent-credential" className="text-[#87867c]">
-                Credential
-              </Label>
-              <select
-                id="agent-credential"
-                value={credentialId}
-                onChange={(event) => setCredentialId(event.target.value)}
-                disabled={isLoadingCredentials || providerCredentials.length === 0}
-                className={FIELD_CLASS}
-              >
-                {providerCredentials.length === 0 ? (
-                  <option value="">
-                    {isLoadingCredentials
-                      ? "Loading credentials…"
-                      : `No ${providerMeta.label} credentials`}
-                  </option>
-                ) : (
-                  providerCredentials.map((credential) => (
-                    <option key={credential.id} value={credential.id}>
-                      {credential.title}
-                    </option>
-                  ))
-                )}
-              </select>
-              {credentialsError ? (
-                <p className="text-xs text-red-400">{credentialsError}</p>
-              ) : providerCredentials.length === 0 && !isLoadingCredentials ? (
-                <p className="text-xs text-[#87867c]">
-                  <Link
-                    href={`/home/credentials?platform=${provider === "google" ? "gemini" : provider}&openCreate=1`}
-                    className="text-[#F04D26] underline hover:text-[#F04D26]/90"
-                  >
-                    Add a {providerMeta.label} credential
-                  </Link>
-                </p>
-              ) : selectedCredential ? (
-                <p className="text-xs text-[#6f6d66]">
-                  Using saved {providerMeta.label} credential
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="agent-model" className="text-[#87867c]">
-                Model
-              </Label>
-              <Input
-                id="agent-model"
-                list={datalistId}
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                placeholder="Enter or pick a model"
-                className="border-[#333333] bg-[#151515] focus-visible:border-[#F04D26]/70 focus-visible:ring-[#F04D26]/40"
-              />
-              <datalist id={datalistId}>
-                {providerMeta.models.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <p className="text-xs text-[#6f6d66]">
-                Pick a suggested model or type a custom one.
-              </p>
-            </div>
-          </div>
-        </section>
 
         {notice && (
           <div
@@ -1021,86 +899,177 @@ export default function AgentPage() {
           </div>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="flex h-[calc(100svh-21rem)] min-h-[420px] flex-col rounded-xl border border-white/10 bg-[#1a1a1a]">
-            <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4">
-              <div className="flex items-center gap-2">
-                <BotMessageSquareIcon className="size-4 text-[#F04D26]" />
-                <h2 className="text-sm font-medium text-white">Conversation</h2>
-                {isStreaming && (
-                  <span className="inline-flex items-center gap-1.5 text-[11px] text-sky-300">
-                    <span className="size-1.5 animate-pulse rounded-full bg-sky-400" />
-                    {isAborting ? "Stopping…" : "Streaming"}
-                  </span>
-                )}
+        <section className="mx-auto flex min-h-0 w-full flex-1 flex-col">
+          <div
+            ref={messageListRef}
+            className="min-h-0 flex-1 space-y-6 overflow-y-auto py-4"
+          >
+            {messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <div>
+                  <p className="text-xl font-medium tracking-tight text-white">
+                    What would you like to build?
+                  </p>
+                  <p className="mt-2 max-w-md text-sm text-[#87867c]">
+                    Ask about a workflow, or describe an automation you want to
+                    create.
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                {isStreaming && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleStop}
-                    disabled={isAborting}
-                    className="h-7 border border-[#444444] bg-[#242424] text-[#e8e6e1] hover:bg-[#2d2d2d] hover:text-white"
-                  >
-                    {isAborting ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Square className="size-3.5" />
-                    )}
-                    {isAborting ? "Stopping" : "Stop"}
-                  </Button>
-                )}
-                {runMeta && (
-                  <div className="hidden items-center gap-3 text-[11px] text-[#6f6d66] sm:flex">
-                    {runMeta.totalTokens !== undefined && (
-                      <span className="inline-flex items-center gap-1">
-                        <Cpu className="size-3" />
-                        {runMeta.totalTokens} tokens
-                      </span>
-                    )}
-                    {runMeta.durationMs !== undefined && (
-                      <span>{runMeta.durationMs} ms</span>
-                    )}
-                    {runMeta.agentRunId && (
-                      <span className="inline-flex items-center gap-1">
-                        <CheckCircle2 className="size-3 text-emerald-400" />
-                        {runMeta.agentRunId.slice(0, 8)}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            ) : (
+              messages.map((message) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  events={events.filter(
+                    (event) => event.assistantId === message.id,
+                  )}
+                  disabled={isStreaming}
+                />
+              ))
+            )}
+          </div>
 
-            <div
-              ref={messageListRef}
-              className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4"
-            >
-              {messages.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                  <span className="flex size-12 items-center justify-center rounded-full bg-[#F04D26]/10 text-[#F04D26] ring-1 ring-[#F04D26]/25">
-                    <BotMessageSquareIcon className="size-6" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-white">
-                      Ask about your workflows
-                    </p>
-                    <p className="mt-1 max-w-sm text-xs text-[#87867c]">
-                      List, validate, create, update, run, or delete workflows.
-                      Select a provider, credential, and model to begin.
-                    </p>
+          <div className="shrink-0 pb-2 pt-3">
+            <div className="overflow-hidden rounded-3xl border border-white/15 bg-[#202020] shadow-xl shadow-black/20 focus-within:border-white/25">
+              <button
+                type="button"
+                onClick={() => setConfigOpen((open) => !open)}
+                aria-expanded={configOpen}
+                aria-controls="agent-configuration"
+                disabled={isStreaming}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs text-[#b9b7af] transition-colors hover:bg-white/[0.03] disabled:opacity-60"
+              >
+                <SlidersHorizontal className="size-3.5 text-[#87867c]" />
+                <span className="min-w-0 flex-1 truncate">
+                  {providerMeta.label} <span className="text-[#6f6d66]">·</span>{" "}
+                  {selectedCredential?.title ?? "Choose credential"}{" "}
+                  <span className="text-[#6f6d66]">·</span>{" "}
+                  {model.startsWith("models/")
+                    ? model.slice("models/".length)
+                    : model}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "size-4 shrink-0 transition-transform",
+                    configOpen && "rotate-180",
+                  )}
+                />
+              </button>
+
+              {configOpen && (
+                <div
+                  id="agent-configuration"
+                  className="grid gap-3 border-t border-white/10 px-4 py-3 sm:grid-cols-3"
+                >
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="agent-provider"
+                      className="flex items-center gap-2 text-[11px] text-[#a4a29a]"
+                    >
+                      Provider
+                    </Label>
+                    <div className="relative">
+                      <Image
+                        src={providerMeta.logo}
+                        alt=""
+                        width={18}
+                        height={18}
+                        unoptimized
+                        className="pointer-events-none absolute left-3 top-1/2 z-10 size-[18px] -translate-y-1/2"
+                      />
+                      <select
+                        id="agent-provider"
+                        value={provider}
+                        onChange={(event) =>
+                          setProvider(event.target.value as ProviderId)
+                        }
+                        disabled={isStreaming}
+                        className={cn(FIELD_CLASS, "rounded-xl pl-10")}
+                      >
+                        {PROVIDER_ORDER.map((id) => (
+                          <option key={id} value={id}>
+                            {PROVIDERS[id].label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="agent-credential"
+                      className="flex items-center gap-2 text-[11px] text-[#a4a29a]"
+                    >
+                      <KeyRound className="size-3.5 text-[#87867c]" />
+                      Credential
+                    </Label>
+                    <select
+                      id="agent-credential"
+                      value={credentialId}
+                      onChange={(event) => setCredentialId(event.target.value)}
+                      disabled={
+                        isLoadingCredentials ||
+                        providerCredentials.length === 0 ||
+                        isStreaming
+                      }
+                      className={cn(FIELD_CLASS, "rounded-xl")}
+                    >
+                      {providerCredentials.length === 0 ? (
+                        <option value="">
+                          {isLoadingCredentials
+                            ? "Loading credentials…"
+                            : `No ${providerMeta.label} credentials`}
+                        </option>
+                      ) : (
+                        providerCredentials.map((credential) => (
+                          <option key={credential.id} value={credential.id}>
+                            {credential.title}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    {credentialsError ? (
+                      <p className="text-[11px] text-red-400">
+                        {credentialsError}
+                      </p>
+                    ) : providerCredentials.length === 0 &&
+                      !isLoadingCredentials ? (
+                      <Link
+                        href={`/home/credentials?platform=${provider === "google" ? "gemini" : provider}&openCreate=1`}
+                        className="inline-block text-[11px] text-[#F04D26] underline hover:text-[#F04D26]/90"
+                      >
+                        Add a {providerMeta.label} credential
+                      </Link>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="agent-model"
+                      className="flex items-center gap-2 text-[11px] text-[#a4a29a]"
+                    >
+                      <Cpu className="size-3.5 text-[#87867c]" />
+                      Model
+                    </Label>
+                    <select
+                      id="agent-model"
+                      value={model}
+                      onChange={(event) => setModel(event.target.value)}
+                      disabled={isStreaming}
+                      className={cn(FIELD_CLASS, "rounded-xl")}
+                    >
+                      {providerMeta.models.map((option) => (
+                        <option key={option} value={option}>
+                          {option.startsWith("models/")
+                            ? option.slice("models/".length)
+                            : option}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              ) : (
-                messages.map((message) => (
-                  <MessageBubble key={message.id} message={message} />
-                ))
               )}
-            </div>
 
-            <div className="shrink-0 border-t border-white/10 p-3">
-              <div className="flex items-end gap-2">
+              <div className="relative px-3 pb-3">
                 <textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
@@ -1112,45 +1081,44 @@ export default function AgentPage() {
                       : "Add or select a credential to start chatting"
                   }
                   disabled={!credentialId || isStreaming}
-                  className="min-h-[52px] max-h-40 w-full resize-y rounded-lg border border-[#333333] bg-[#151515] px-3 py-2.5 text-sm text-white outline-none transition-colors placeholder:text-[#6b6b68] focus-visible:border-[#F04D26]/70 focus-visible:ring-1 focus-visible:ring-[#F04D26]/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-[56px] max-h-48 w-full resize-y bg-transparent px-2 py-3 pr-14 text-sm text-white outline-none placeholder:text-[#77756e] disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 {isStreaming ? (
-                  <Button
+                  <button
                     type="button"
                     onClick={handleStop}
                     disabled={isAborting}
-                    className="h-10 shrink-0 border border-[#333333] bg-[#1d1d1d] text-[#e8e6e1] hover:bg-[#242424] hover:text-white"
+                    aria-label={
+                      isAborting ? "Stopping response" : "Stop response"
+                    }
+                    title={isAborting ? "Stopping response" : "Stop response"}
+                    className="absolute bottom-4 right-4 flex size-9 items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-white/85 disabled:cursor-wait disabled:opacity-70"
                   >
                     {isAborting ? (
                       <Loader2 className="size-4 animate-spin" />
                     ) : (
-                      <Square className="size-4" />
+                      <Square className="size-3.5 fill-current" />
                     )}
-                    {isAborting ? "Stopping" : "Stop"}
-                  </Button>
+                  </button>
                 ) : (
-                  <Button
+                  <button
                     type="button"
                     onClick={() => void handleSend()}
                     disabled={!canSend}
-                    className={cn(PRIMARY_BUTTON, "h-10 shrink-0")}
+                    aria-label="Send message"
+                    title="Send message"
+                    className="absolute bottom-4 right-4 flex size-9 items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-white/85 disabled:cursor-not-allowed disabled:bg-[#454545] disabled:text-[#8a8a8a]"
                   >
                     <Send className="size-4" />
-                    Send
-                  </Button>
+                  </button>
                 )}
               </div>
-              <p className="mt-2 flex items-center gap-1.5 text-[11px] text-[#6f6d66]">
-                <KeyRound className="size-3" />
-                Requests run on the server with your selected saved credential.
-              </p>
             </div>
-          </section>
-
-          <div className="h-[420px] lg:h-[calc(100svh-21rem)] lg:min-h-[420px]">
-            <EventsPanel events={events} onClear={() => setEvents([])} />
+            <p className="mt-2 text-center text-[10px] text-[#6f6d66]">
+              AI can make mistakes. Check workflow changes before running them.
+            </p>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
