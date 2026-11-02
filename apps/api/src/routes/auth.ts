@@ -37,7 +37,7 @@ const userSelect = {
 } as const;
 
 const hashResetCode = (email: string, otp: string) => {
-    const secret = process.env.BETTER_AUTH_SECRET ?? process.env.EXECUTION_STREAM_SIGNING_SECRET;
+    const secret = process.env.EXECUTION_STREAM_SIGNING_SECRET;
     if (!secret) throw new HTTPException(503, { message: "Password reset is not configured yet" });
     return createHmac("sha256", secret).update(`${email}:${otp}`).digest("hex");
 };
@@ -84,7 +84,7 @@ const app = new Hono().post(
     createRateLimiter(3, 60_000),
     zValidator("json", ForgotPasswordRequestSchema, validationHook),
     async (c) => {
-        if (!isSmtpConfigured() || !(process.env.BETTER_AUTH_SECRET ?? process.env.EXECUTION_STREAM_SIGNING_SECRET)) {
+        if (!isSmtpConfigured() || !( process.env.EXECUTION_STREAM_SIGNING_SECRET)) {
             throw new HTTPException(503, { message: "Password reset email is not configured yet" });
         }
         const { email } = c.req.valid("json");
@@ -113,7 +113,7 @@ const app = new Hono().post(
     createRateLimiter(5, 60_000),
     zValidator("json", ForgotPasswordResetSchema, validationHook),
     async (c) => {
-        if (!(process.env.BETTER_AUTH_SECRET ?? process.env.EXECUTION_STREAM_SIGNING_SECRET)) {
+        if (!(process.env.EXECUTION_STREAM_SIGNING_SECRET)) {
             throw new HTTPException(503, { message: "Password reset is not configured yet" });
         }
         const { email, otp, newPassword } = c.req.valid("json");

@@ -28,7 +28,7 @@ The server reads `PORT` and defaults to `8080`. Routes are mounted under `/api/v
 
 Password-reset email additionally requires `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM`. Configure provider API keys for AI routes when using them.
 
-If `EXECUTION_STREAM_SIGNING_SECRET` is unset, the API can use `BETTER_AUTH_SECRET` as a fallback; configure the WebSocket service with the exact same effective secret. The web app sends credentialed requests, so set `WEB_APP_URL` to the browser origin rather than the API URL.
+If `EXECUTION_STREAM_SIGNING_SECRET` is unset, the API can use as a fallback; configure the WebSocket service with the exact same effective secret. The web app sends credentialed requests, so set `WEB_APP_URL` to the browser origin rather than the API URL.
 
 ## Database changes
 

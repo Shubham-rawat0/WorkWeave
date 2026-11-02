@@ -45,7 +45,7 @@ export function resolveExecutionStreamSigningSecret(): string {
         process.env.EXECUTION_STREAM_SIGNING_SECRET?.trim();
     if (!secret) {
         throw new Error(
-            "Execution stream signing secret is required. Set BETTER_AUTH_SECRET or EXECUTION_STREAM_SIGNING_SECRET.",
+            "Execution stream signing secret is required. Set EXECUTION_STREAM_SIGNING_SECRET.",
         );
     }
     return secret;

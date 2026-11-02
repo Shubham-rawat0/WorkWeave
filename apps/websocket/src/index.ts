@@ -19,7 +19,7 @@ const port = Number.parseInt(
 const signingSecret = process.env.EXECUTION_STREAM_SIGNING_SECRET?.trim()
 if (!signingSecret || signingSecret.length === 0) {
     throw new Error(
-        "Missing execution stream signing secret. Set BETTER_AUTH_SECRET or EXECUTION_STREAM_SIGNING_SECRET.",
+        "Missing execution stream signing secret. EXECUTION_STREAM_SIGNING_SECRET.",
     );
 }
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000;
