@@ -2,6 +2,10 @@ import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { prisma } from "@WorkOrchestrator/prisma";
 import { generateSessionToken, getHashToken } from "../lib/auth";
+import {
+    BASE_COOKIE_OPTIONS,
+    SESSION_COOKIE_NAME,
+} from "../lib/cookies";
 
 //network
 
@@ -27,19 +31,11 @@ export function getUserAgent(c: Context): string | null {
     return c.req.header("user-agent") ?? null;
 }
 
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const SESSION_COOKIE = IS_PRODUCTION
-    ? "__Host-session"
-    : "session";
+const SESSION_COOKIE = SESSION_COOKIE_NAME;
 
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 
-const COOKIE_OPTIONS = {
-    httpOnly: true,
-    secure: IS_PRODUCTION,
-    sameSite: "Lax",
-    path: "/",
-} as const;
+const COOKIE_OPTIONS = BASE_COOKIE_OPTIONS;
 
 export function getSessionCookie(c: Context): string | undefined {
     return getCookie(c, SESSION_COOKIE);

@@ -1,21 +1,17 @@
 import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { OAuth2Client } from "google-auth-library";
+import {
+    BASE_COOKIE_OPTIONS,
+    OAUTH_STATE_COOKIE_NAME,
+} from "./cookies";
 
 export const GOOGLE_SCOPES = ["openid", "email", "profile"];
 
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const OAUTH_STATE_COOKIE = IS_PRODUCTION
-    ? "__Host-google_oauth"
-    : "google_oauth";
+const OAUTH_STATE_COOKIE = OAUTH_STATE_COOKIE_NAME;
 const OAUTH_STATE_MAX_AGE = 10 * 60; // 10 minutes in seconds
 
-const OAUTH_COOKIE_OPTIONS = {
-    httpOnly: true,
-    secure: IS_PRODUCTION,
-    sameSite: "Lax",
-    path: "/",
-} as const;
+const OAUTH_COOKIE_OPTIONS = BASE_COOKIE_OPTIONS;
 
 let client: OAuth2Client | undefined;
 
