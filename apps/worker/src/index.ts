@@ -24,9 +24,38 @@ function validateRequiredEnv(): void {
 
 const WORKER_ID = `worker-${process.pid}`;
 const STARTUP_TIMEOUT_MS = 30_000;
+const port = Number.parseInt(process.env.PORT ?? "", 10) || 8080;
+
+type HealthServer = { stop(force?: boolean): void };
+type BunRuntime = {
+    serve(options: {
+        port: number;
+        hostname: string;
+        fetch(request: Request): Response;
+    }): HealthServer;
+};
 
 let shuttingDown = false;
+let workerReady = false;
+let workerFailed = false;
 let stopCronScheduler: (() => void) | undefined;
+
+const healthServer = (globalThis as typeof globalThis & { Bun: BunRuntime }).Bun.serve({
+    port,
+    hostname: "0.0.0.0",
+    fetch(request) {
+        const { pathname } = new URL(request.url);
+        if (pathname === "/health") {
+            const status = workerFailed ? "unhealthy" : workerReady ? "healthy" : "starting";
+            return Response.json(
+                { status, service: "bullmq-worker" },
+                { status: workerFailed ? 503 : 200 },
+            );
+        }
+        return new Response("Not Found", { status: 404 });
+    },
+});
+console.log(`[${WORKER_ID}] Health server listening on 0.0.0.0:${port}`);
 
 async function bootstrap():Promise<void>{
     loadWorkerEnv()
@@ -58,6 +87,7 @@ async function bootstrap():Promise<void>{
         forceExit.unref();
         try {
             await worker.close();
+            healthServer.stop(true);
             console.log(`[${WORKER_ID}] Worker gracefully stopped`);
             process.exit(0);
         } catch (error) {
@@ -87,6 +117,8 @@ async function bootstrap():Promise<void>{
     }
     if (shuttingDown) return;
     void worker.run().catch((error) => {
+        workerFailed = true;
+        workerReady = false;
         console.error(
             `[${WORKER_ID}] Worker run loop stopped unexpectedly:`,
             error,
@@ -95,12 +127,15 @@ async function bootstrap():Promise<void>{
     });
 
     stopCronScheduler = startCronScheduler();
+    workerReady = true;
     console.log(
         `[${WORKER_ID}] Worker started and ready to process workflow runs`,
     );
 }
 
 void bootstrap().catch((error) => {
+    workerFailed = true;
     console.error(`[${WORKER_ID}] Worker failed to start:`, error);
+    healthServer.stop(true);
     process.exit(1);
 });
