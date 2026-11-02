@@ -396,12 +396,33 @@ export function ExecutionEventFeed({
     () => events.filter((event) => getTone(event) === "error").length,
     [events],
   );
+  const runHasEnded = useMemo(() => {
+    const status = workflowEvent?.status?.toLowerCase();
+    return (
+      state === "finished" ||
+      status === "success" ||
+      status === "succeeded" ||
+      status === "completed" ||
+      status === "failure" ||
+      status === "failed" ||
+      status === "cancelled" ||
+      status === "canceled"
+    );
+  }, [state, workflowEvent]);
   const visibleEvents = useMemo(
-    () =>
-      errorsOnly
-        ? events.filter((event) => getTone(event) === "error")
-        : events,
-    [errorsOnly, events],
+    () => {
+      const settledEvents = runHasEnded
+        ? events.filter((event) => {
+            if (event.type !== "node") return true;
+            const tone = getTone(event);
+            return tone !== "pending" && tone !== "running";
+          })
+        : events;
+      return errorsOnly
+        ? settledEvents.filter((event) => getTone(event) === "error")
+        : settledEvents;
+    },
+    [errorsOnly, events, runHasEnded],
   );
 
   const stateMeta = STATE_META[state];
@@ -466,13 +487,6 @@ export function ExecutionEventFeed({
       : state === "finished"
         ? "This run finished without emitting timeline events."
         : "The run is live. Node activity will appear here.";
-
-  const runHasEnded =
-    !errorsOnly &&
-    (state === "finished" ||
-      (workflowEvent &&
-        (getTone(workflowEvent) === "success" ||
-          getTone(workflowEvent) === "error")));
 
   return (
     <section

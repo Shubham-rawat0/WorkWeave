@@ -1,25 +1,32 @@
-# websocket
+# WorkWeave WebSocket Service
 
-To install dependencies:
+This service delivers live workflow updates to the browser. It subscribes to Redis pub/sub channels written by the worker and streams workflow and node status, output, and error events to clients holding a short-lived signed token from the API.
+
+## Local development
+
+From the repository root:
 
 ```bash
 bun install
+bun --cwd apps/websocket run src/index.ts
 ```
 
-To run:
+Or from `apps/websocket`, run `bun src/index.ts`. The service listens on port `3101` by default.
 
-```bash
-bun run src/index.ts
-```
+- Health check: `GET http://localhost:3101/health`
+- Stream: `ws://localhost:3101/ws/executions?token=<signed-token>`
 
-Environment variables (loaded from the repository root `.env`):
+## Environment
 
-- `EXECUTION_STREAM_SIGNING_SECRET` (required) — must match the API signer.
-- `REALTIME_HOST` / `REALTIME_PORT` (optional, defaults `::` / `3101`).
-- `REDIS_URL` or `REDIS_HOST`/`REDIS_PORT` (for the pub/sub stream).
+| Variable | Purpose |
+| --- | --- |
+| `REDIS_URL` | Authenticated Upstash native TCP/TLS URL (`rediss://...upstash.io:6379`), shared with API and worker. |
+| `EXECUTION_STREAM_SIGNING_SECRET` | Must match the API’s signing secret. |
+| `REALTIME_HOST` | Listen host; defaults to `::`. |
+| `REALTIME_PORT` | Listen port; defaults to `PORT` if set, otherwise `3101`. |
 
-Health check: `GET /health`. Stream endpoint: `WS /ws/executions?token=<signed token>`.
-Configure the API's `EXECUTION_WS_URL` to the publicly reachable websocket
-base URL so the web app can connect to this service.
+The service loads the repository-root `.env` when run from the monorepo. Set the API’s `EXECUTION_WS_URL` and the web app’s `NEXT_PUBLIC_EXECUTION_WS_URL` to the public WebSocket base URL when the default URL does not match the deployed topology. Use `wss://` behind TLS termination.
 
-This project was created using `bun init` in bun v1.3.14. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+## Security and deployment
+
+The API signs run-specific stream tokens and the WebSocket service verifies them before subscribing to a run channel. Keep the signing secret private and identical across the API and WebSocket service. Expose this service publicly through a host or proxy that supports WebSocket upgrades; keep Redis private and accessible to the service over TLS.

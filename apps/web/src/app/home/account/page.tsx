@@ -116,9 +116,14 @@ function ProfileSection() {
   const { user, refresh } = useUser();
   const [name, setName] = useState(user.name);
   const [image, setImage] = useState(user.image ?? "");
+  const [imageFailed, setImageFailed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [image]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -143,10 +148,12 @@ function ProfileSection() {
     <Section title="Profile" description="Update your display name and avatar.">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-center gap-4">
-          {preview ? (
+          {preview && !imageFailed ? (
             <img
               src={preview}
               alt={name}
+              referrerPolicy="no-referrer"
+              onError={() => setImageFailed(true)}
               className="size-14 rounded-full object-cover ring-1 ring-white/10"
             />
           ) : (
@@ -190,6 +197,7 @@ function ProfileSection() {
               onClick={() => {
                 setName(user.name);
                 setImage(user.image ?? "");
+                setImageFailed(false);
                 setError(null);
                 setSuccess(null);
               }}

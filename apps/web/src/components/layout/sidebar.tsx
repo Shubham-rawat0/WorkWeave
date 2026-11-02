@@ -1,6 +1,6 @@
 "use client"
 
-import type { CSSProperties } from "react"
+import { useState, type CSSProperties } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
@@ -84,11 +84,15 @@ function CollapseTrigger({ className }: { className?: string }) {
 }
 
 function UserAvatar({ user }: { user: User }) {
-  if (user.image) {
+  const [imageFailed, setImageFailed] = useState(false)
+
+  if (user.image && !imageFailed) {
     return (
       <img
         src={user.image}
         alt={user.name}
+        referrerPolicy="no-referrer"
+        onError={() => setImageFailed(true)}
         className="size-7 shrink-0 rounded-full object-cover ring-1 ring-white/10"
       />
     )

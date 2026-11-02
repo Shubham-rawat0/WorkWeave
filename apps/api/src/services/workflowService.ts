@@ -19,6 +19,12 @@ function toJson(value: unknown): Prisma.InputJsonValue {
         : value as Prisma.InputJsonValue;
 }
 
+// The exported client is extended with retry logic, so its transaction
+// callback type is structurally narrower than Prisma.TransactionClient.
+function asTransactionClient(client: unknown): Prisma.TransactionClient {
+    return client as Prisma.TransactionClient;
+}
+
 async function assertAvailableActionsExist(actionIds: readonly string[]): Promise<void> {
     const uniqueIds = [...new Set(actionIds)];
     if (uniqueIds.length === 0) return;
@@ -95,7 +101,7 @@ export async function createWorkflow(userId: string, input: CreateWorkflowInput)
                 actions: { include: { type: true }, orderBy: { sortingOrder: "asc" } },
             },
         });
-        await syncWebhookEndpoints(tx, created.id, input.nodes);
+        await syncWebhookEndpoints(asTransactionClient(tx), created.id, input.nodes);
         return created;
     });
     return { workflow, webhookEndpoints: await getWebhookEndpointUrls(workflow.id) };
@@ -123,7 +129,7 @@ export async function updateWorkflow(userId: string, input: UpdateWorkflowInput)
         });
         if (!updated.count) throw new HTTPException(404, { message: "Workflow not found" });
         // Keep webhook endpoints in the same transaction as the saved graph.
-        await syncWebhookEndpoints(tx, input.id, input.nodes ?? existing.nodes);
+        await syncWebhookEndpoints(asTransactionClient(tx), input.id, input.nodes ?? existing.nodes);
         if (input.triggerMetadata !== undefined) {
             await tx.trigger.updateMany({ where: { workflowId: input.id }, data: { metadata: toJson(input.triggerMetadata) } });
         }
