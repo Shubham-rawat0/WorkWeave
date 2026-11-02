@@ -32,8 +32,7 @@ export function AuthLayout({
         <div className="mb-8 flex items-center justify-center gap-2.5">
           <WLogo className="h-9 w-9" />
           <span className="text-lg font-semibold tracking-tight text-white">
-            Work
-            <span className="font-medium text-[#a89fc0]">Orchestrator</span>
+            WorkWeave
           </span>
         </div>
 

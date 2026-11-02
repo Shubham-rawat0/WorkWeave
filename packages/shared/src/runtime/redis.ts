@@ -2,7 +2,7 @@ import Redis, { type RedisOptions } from "ioredis";
 import type { RedisOptions as BullRedisOptions } from "bullmq";
 
 type RedisConnectionOptions = Pick<
-    BullRedisOptions,
+    RedisOptions,
     | "host"
     | "port"
     | "username"
@@ -11,7 +11,16 @@ type RedisConnectionOptions = Pick<
     | "maxRetriesPerRequest"
     | "lazyConnect"
     | "tls"
->;
+> & {
+    host?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+    db?: number;
+    maxRetriesPerRequest?: number | null;
+    lazyConnect?: boolean;
+    tls?: RedisOptions["tls"];
+};
 
 const redisErrorLogTimestamps = new Map<string, number>();
 
@@ -28,10 +37,10 @@ const REDIS_CONNECT_ERROR_CODES = new Set([
 ]);
 
 
-// maxRetriesPerRequest:null is required for BullMQ workers (commands may
-// wait indefinitely); lazyConnect defers the socket so apps boot without Redis.
+// Keep normal clients bounded. BullMQ workers override this to null because
+// queue commands are allowed to wait while Redis reconnects.
 const commonRedisOptions: RedisConnectionOptions = {
-    maxRetriesPerRequest: null,
+    maxRetriesPerRequest: 3,
     lazyConnect: true,
 };
 const fallbackLogTimestamps = new Map<string, number>();
@@ -49,21 +58,26 @@ function parseRedisPort(value: string | undefined, fallback: number): number {
     return parsed;
 }
 
-// REDIS_URL / UPSTASH_REDIS_URL win over discrete env vars; full URL also
-// encodes username/password/db — parse them into the connection options.
+// Only accept Upstash's native Redis TCP/TLS URL. REST credentials are HTTP
+// credentials and cannot be used by ioredis or BullMQ.
 function parseRedisUrl(url: string): RedisConnectionOptions {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:") {
+    // dotenv preserves quotes when a value is quoted with spaces or other
+    // special characters; accept the common quoted URL form as well.
+    const normalizedUrl = url.trim().replace(/^(["'])(.*)\1$/, "$2");
+    const parsed = new URL(normalizedUrl);
+    if (parsed.protocol !== "rediss:") {
         throw new Error(
-            `[redis] Unsupported URL protocol "${parsed.protocol}". Use redis:// or rediss://`,
+            `[redis] Unsupported URL protocol "${parsed.protocol}". Upstash connections require rediss://`,
         );
     }
-    const isTls = parsed.protocol === "rediss:";
+    if (!parsed.hostname.toLowerCase().endsWith(".upstash.io")) {
+        throw new Error("Redis host must be an Upstash *.upstash.io endpoint");
+    }
 
     const options: RedisConnectionOptions = {
         ...commonRedisOptions,
         host: parsed.hostname,
-        port: parseRedisPort(parsed.port || undefined, isTls ? 443 : 6379),
+        port: parseRedisPort(parsed.port || undefined, 6379),
     };
 
     if (parsed.username) {
@@ -72,39 +86,42 @@ function parseRedisUrl(url: string): RedisConnectionOptions {
     if (parsed.password) {
         options.password = decodeURIComponent(parsed.password);
     }
+    if (!options.host || !options.password) {
+        throw new Error("Redis URL must include a host and password");
+    }
     if (parsed.pathname && parsed.pathname !== "/") {
         const dbValue = Number.parseInt(parsed.pathname.slice(1), 10);
         if (Number.isFinite(dbValue) && dbValue >= 0) {
             options.db = dbValue;
         }
     }
-    if (isTls) {
-        options.tls = {};
-    }
+    options.tls = {};
 
     return options;
 }
 
 export function getRedisConnectionOptions(): RedisConnectionOptions {
     const redisUrl = process.env.REDIS_URL?.trim() || process.env.UPSTASH_REDIS_URL?.trim();
-    if (redisUrl) {
-        const configuredFrom = process.env.REDIS_URL?.trim()
-            ? "REDIS_URL"
-            : "UPSTASH_REDIS_URL";
-        try {
-            return parseRedisUrl(redisUrl);
-        } catch (error) {
-            const details = error instanceof Error ? error.message : String(error);
-            throw new Error(
-                `[redis] Invalid ${configuredFrom}. Expected redis:// or rediss:// URL. ${details}`,
-            );
-        }
+    if (!redisUrl) {
+        throw new Error(
+            "[redis] REDIS_URL is required and must be the Upstash TCP connection string from Connect → TCP (rediss://default:<password>@<host>.upstash.io:6379). REST URL/token cannot be used by BullMQ.",
+        );
     }
+    const configuredFrom = process.env.REDIS_URL?.trim()
+        ? "REDIS_URL"
+        : "UPSTASH_REDIS_URL";
+    try {
+        return parseRedisUrl(redisUrl);
+    } catch (error) {
+        const details = error instanceof Error ? error.message : String(error);
+        throw new Error(`[redis] Invalid ${configuredFrom}. ${details}`);
+    }
+}
 
+export function getBullMQRedisConnectionOptions(): BullRedisOptions {
     return {
-        ...commonRedisOptions,
-        host: process.env.REDIS_HOST || "localhost",
-        port: parseRedisPort(process.env.REDIS_PORT, 6379),
+        ...getRedisConnectionOptions(),
+        maxRetriesPerRequest: null,
     };
 }
 
@@ -191,9 +208,9 @@ function logThrottledWarning(
 
 function attachRedisErrorLogging(client: Redis, label: string): void {
     client.on("error", (error) => {
-        console.error(`[redis:${label}] error`, error);
-
+        const code = getErrorCode(error);
         const reason = error instanceof Error ? error.message : String(error);
+        console.error(`[redis:${label}] error${code ? ` (${code})` : ""}: ${reason}`);
         logThrottledWarning(
             redisErrorLogTimestamps,
             `${label}:${reason}`,

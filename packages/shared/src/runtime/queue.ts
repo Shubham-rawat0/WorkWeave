@@ -1,5 +1,5 @@
 import { Queue, type QueueOptions } from "bullmq";
-import { getRedisConnectionOptions } from "./redis";
+import { getBullMQRedisConnectionOptions } from "./redis";
 
 export const queueName = "workflow-runs";
 
@@ -19,7 +19,7 @@ const defaultJobOptions: NonNullable<QueueOptions["defaultJobOptions"]> = {
 
 function createQueueOptions():QueueOptions{
     return {
-        connection:getRedisConnectionOptions(),
+        connection:getBullMQRedisConnectionOptions(),
         defaultJobOptions
     }
 }

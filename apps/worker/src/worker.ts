@@ -1,5 +1,5 @@
 import { queueName, WorkflowJobData } from "@WorkOrchestrator/shared/queue";
-import { getRedisConnectionOptions } from "@WorkOrchestrator/shared/redis";
+import { getBullMQRedisConnectionOptions } from "@WorkOrchestrator/shared/redis";
 import { Worker } from "bullmq";
 import { executeWorkflow } from "./engine/executor";
 
@@ -16,7 +16,7 @@ export const worker=new Worker<WorkflowJobData>(queueName,async(job)=>{
         throw error;
     }
 }, {
-    connection: getRedisConnectionOptions(),
+    connection: getBullMQRedisConnectionOptions(),
     concurrency: 5,
     autorun: false,
 },)
