@@ -4,11 +4,27 @@ WorkWeave is a visual workflow automation platform. Connect triggers, conditions
 
 ## Product preview
 
-| Workflow builder | Execution view |
-| --- | --- |
-| ![WorkWeave workflow builder](packages/shared/src/assets/Screenshot%20(52).png) | ![WorkWeave execution view](packages/shared/src/assets/Screenshot%20(53).png) |
+![WorkWeave start page](packages/shared/src/assets/Screenshot%20(52).png)
 
-More screenshots: [54](packages/shared/src/assets/Screenshot%20(54).png) · [55](packages/shared/src/assets/Screenshot%20(55).png) · [56](packages/shared/src/assets/Screenshot%20(56).png) · [57](packages/shared/src/assets/Screenshot%20(57).png).
+### Dashboard
+
+![WorkWeave dashboard](packages/shared/src/assets/Screenshot%20(53).png)
+
+### Execution and history
+
+![WorkWeave execution and history](packages/shared/src/assets/Screenshot%20(54).png)
+
+### Workflow builder
+
+![WorkWeave workflow builder](packages/shared/src/assets/Screenshot%20(55).png)
+
+### AI agent
+
+![WorkWeave AI agent](packages/shared/src/assets/Screenshot%20(56).png)
+
+### Credential management
+
+![WorkWeave credential management](packages/shared/src/assets/Screenshot%20(57).png)
 
 ## Features
 
