@@ -25,6 +25,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   provider        String
   password          String?
+  workflowAgent   WorkflowAgent[]
 }
 
 model PasswordResetToken {
@@ -189,6 +190,25 @@ model UsageRecord {
   user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, month])
+}
+
+model WorkflowAgent{
+  id        String @id @default(uuid())
+  userId    String
+  user      User  @relation(fields:[userId],references:[id], onDelete:Cascade)
+  prompt    String
+  status    WorkflowAgentStatus @default(Processing)
+  model     String
+  result    Json?
+  createdAt DateTime  @default(now())
+  workflowId String?
+  @@index([userId,createdAt])
+}
+
+enum WorkflowAgentStatus{
+  Processing
+  Completed
+  Failed
 }
 
 enum WorkflowStatus {

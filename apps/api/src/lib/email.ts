@@ -21,7 +21,7 @@ export async function sendPasswordResetCode(email: string, otp: string) {
     await transporter.sendMail({
         from: SMTP_FROM,
         to: email,
-        subject: "Your WorkOrchestrator password reset code",
+        subject: "Your workWeave password reset code",
         text: `Your password reset code is ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`,
     });
 }

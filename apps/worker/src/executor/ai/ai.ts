@@ -12,8 +12,15 @@ type AIProvider = "openai" | "anthropic" | "gemini";
 type AIInputMode = "prompt" | "json";
 const MAX_PROMPT_CHARS = 200_000;
 const AI_REQUEST_TIMEOUT_MS = 120_000;
-const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+const DEFAULT_GEMINI_MODEL = "models/gemini-3.1-pro-preview";
 const UNAVAILABLE_GEMINI_MODEL = "gemini-2.5-flash";
+
+function normalizeGeminiModel(model: string): string {
+    const trimmed = model.trim();
+    return trimmed.startsWith("models/")
+        ? trimmed.slice("models/".length)
+        : trimmed;
+}
 const PROMPT_TRUNCATION_SUFFIX =
     "\n\n[Prompt truncated to stay within model context limits]";
 const AI_PROVIDER_BY_NODE_TYPE: Record<SupportedAINodeType, AIProvider> = {
@@ -24,7 +31,7 @@ const AI_PROVIDER_BY_NODE_TYPE: Record<SupportedAINodeType, AIProvider> = {
 };
 const DEFAULT_MODEL_BY_PROVIDER: Record<AIProvider, string> = {
     openai: "gpt-5-mini",
-    anthropic: "claude-sonnet-4-5",
+    anthropic: "claude-sonnet-4-6",
     gemini: DEFAULT_GEMINI_MODEL,
 };
 
@@ -372,7 +379,8 @@ async function executeGeminiRequest(params: {
     temperature?: number;
     maxTokens?: number;
 }): Promise<NodeExecutionOutput> {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(params.model)}:generateContent?key=${encodeURIComponent(params.apiKey)}`;
+    const modelPath = normalizeGeminiModel(params.model);
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelPath)}:generateContent?key=${encodeURIComponent(params.apiKey)}`;
     const generationConfig = {
         ...(params.temperature !== undefined
             ? { temperature: params.temperature }
@@ -556,7 +564,8 @@ async function executeGeminiJsonRequest(params: {
     temperature?: number;
     maxTokens?: number;
 }): Promise<NodeExecutionOutput> {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(params.model)}:generateContent?key=${encodeURIComponent(params.apiKey)}`;
+    const modelPath = normalizeGeminiModel(params.model);
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelPath)}:generateContent?key=${encodeURIComponent(params.apiKey)}`;
     const body: Record<string, unknown> = {
         ...params.requestBody,
     };
@@ -666,7 +675,9 @@ export async function executeAINode(
     
     const parsedSystemPrompt=systemPrompt?parseTemplate(systemPrompt,runMetadata):undefined
     const resolvedModel =
-        provider === "gemini" && trimmedModel === UNAVAILABLE_GEMINI_MODEL
+        provider === "gemini" &&
+        trimmedModel &&
+        normalizeGeminiModel(trimmedModel) === UNAVAILABLE_GEMINI_MODEL
             ? DEFAULT_GEMINI_MODEL
             : trimmedModel || DEFAULT_MODEL_BY_PROVIDER[provider];
 

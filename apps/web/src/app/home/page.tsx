@@ -8,12 +8,25 @@ import {
   ChevronRightIcon,
   CircleDotIcon,
   CuboidIcon,
+  PencilIcon,
   PlusIcon,
   SearchIcon,
   Share2Icon,
+  Trash2Icon,
 } from "lucide-react";
 import { api, type WorkflowStatus, type WorkflowSummary } from "@/lib/api";
 import { generateWorkflowName } from "@/lib/utils/randomWorkflowName";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const PAGE_SIZE = 8;
 
@@ -68,7 +81,7 @@ function StatusValue({ status }: { status: WorkflowStatus | null }) {
     );
   }
 
-  const style = STATUS_STYLES[status];
+  const style = STATUS_STYLES[status] ?? { label: status, text: "text-zinc-400" };
   const dot =
     status === "Success"
       ? "bg-emerald-400"
@@ -90,31 +103,43 @@ function StatusValue({ status }: { status: WorkflowStatus | null }) {
   );
 }
 
-function WorkflowCard({ workflow }: { workflow: WorkflowSummary }) {
+const WORKFLOW_ACTION_BUTTON =
+  "flex size-6 items-center justify-center rounded-md text-[#87867c] transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F04D26]";
+
+function WorkflowCard({
+  workflow,
+  onRename,
+  onDelete,
+}: {
+  workflow: WorkflowSummary;
+  onRename: (workflow: WorkflowSummary) => void;
+  onDelete: (workflow: WorkflowSummary) => void;
+}) {
   const created = formatDateTime(workflow.createdAt);
   const updated = formatDateTime(workflow.updatedAt);
 
   return (
-    <Link
-      href={`/home/${workflow.id}`}
-      className="group flex w-full flex-col rounded-xl border border-[#333333] bg-[#1a1a1a] p-4 text-left transition-colors hover:border-[#F04D26]/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F04D26]"
-    >
-      <div className="flex items-start gap-3">
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-inset ring-white/10">
-          <CuboidIcon aria-hidden="true" className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1 pt-0.5">
-          <h3 className="truncate text-sm font-semibold text-white">
-            {workflow.title}
-          </h3>
-          <p className="mt-1.5 text-[11px] text-[#87867c]">
-            Created {created ?? "—"}
-          </p>
-          <p className="mt-0.5 text-[11px] text-[#87867c]">
-            Updated {updated ?? "—"}
-          </p>
+    <div className="relative">
+      <Link
+        href={`/home/${workflow.id}`}
+        className="group flex w-full flex-col rounded-xl border border-[#333333] bg-[#1a1a1a] p-4 text-left transition-colors hover:border-[#F04D26]/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F04D26]"
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-inset ring-white/10">
+            <CuboidIcon aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1 pr-14 pt-0.5">
+            <h3 className="truncate text-sm font-semibold text-white">
+              {workflow.title}
+            </h3>
+            <p className="mt-1.5 text-[11px] text-[#87867c]">
+              Created {created ?? "—"}
+            </p>
+            <p className="mt-0.5 text-[11px] text-[#87867c]">
+              Updated {updated ?? "—"}
+            </p>
+          </div>
         </div>
-      </div>
 
       <div className="my-3.5 h-px w-full bg-white/5" />
 
@@ -146,7 +171,28 @@ function WorkflowCard({ workflow }: { workflow: WorkflowSummary }) {
           </p>
         </div>
       </div>
-    </Link>
+      </Link>
+      <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onRename(workflow)}
+          title="Rename workflow"
+          aria-label={`Rename ${workflow.title}`}
+          className={WORKFLOW_ACTION_BUTTON}
+        >
+          <PencilIcon aria-hidden="true" className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(workflow)}
+          title="Delete workflow"
+          aria-label={`Delete ${workflow.title}`}
+          className={`${WORKFLOW_ACTION_BUTTON} hover:bg-red-500/15 hover:text-red-400`}
+        >
+          <Trash2Icon aria-hidden="true" className="size-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -155,6 +201,16 @@ function WorkflowsSection({ searchQuery }: { searchQuery: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [renameTarget, setRenameTarget] = useState<WorkflowSummary | null>(
+    null,
+  );
+  const [renameValue, setRenameValue] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<WorkflowSummary | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -179,6 +235,59 @@ function WorkflowsSection({ searchQuery }: { searchQuery: string }) {
   useEffect(() => {
     setPage(0);
   }, [searchQuery]);
+
+  const openRenameDialog = useCallback((workflow: WorkflowSummary) => {
+    setRenameTarget(workflow);
+    setRenameValue(workflow.title);
+    setActionError(null);
+  }, []);
+
+  const openDeleteDialog = useCallback((workflow: WorkflowSummary) => {
+    setDeleteTarget(workflow);
+    setActionError(null);
+  }, []);
+
+  async function handleRename() {
+    if (!renameTarget) return;
+    const title = renameValue.trim();
+    if (!title) return;
+    setIsRenaming(true);
+    setActionError(null);
+    try {
+      await api.updateWorkflow({ id: renameTarget.id, title });
+      setWorkflows((current) =>
+        current.map((workflow) =>
+          workflow.id === renameTarget.id ? { ...workflow, title } : workflow,
+        ),
+      );
+      setRenameTarget(null);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to rename workflow.",
+      );
+    } finally {
+      setIsRenaming(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setActionError(null);
+    try {
+      await api.deleteWorkflow(deleteTarget.id);
+      setWorkflows((current) =>
+        current.filter((workflow) => workflow.id !== deleteTarget.id),
+      );
+      setDeleteTarget(null);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete workflow.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   const filteredWorkflows = workflows.filter((workflow) =>
     workflow.title.toLowerCase().includes(searchQuery.trim().toLowerCase()),
@@ -220,7 +329,12 @@ function WorkflowsSection({ searchQuery }: { searchQuery: string }) {
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             {visible.map((workflow) => (
-              <WorkflowCard key={workflow.id} workflow={workflow} />
+              <WorkflowCard
+                key={workflow.id}
+                workflow={workflow}
+                onRename={openRenameDialog}
+                onDelete={openDeleteDialog}
+              />
             ))}
           </div>
 
@@ -251,6 +365,118 @@ function WorkflowsSection({ searchQuery }: { searchQuery: string }) {
           </div>
         </>
       )}
+
+      <Dialog
+        open={Boolean(renameTarget)}
+        onOpenChange={(open) => {
+          if (!open) setRenameTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename Workflow</DialogTitle>
+            <DialogDescription>
+              Choose a new name for this workflow.
+            </DialogDescription>
+          </DialogHeader>
+          {renameTarget && (
+            <div className="space-y-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+              <p className="text-xs font-medium text-[#87867c]">Workflow ID</p>
+              <p className="select-all break-all font-mono text-xs text-[#c9c9c5]">
+                {renameTarget.id}
+              </p>
+            </div>
+          )}
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleRename();
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="workflow-rename-input">Workflow name</Label>
+              <Input
+                id="workflow-rename-input"
+                value={renameValue}
+                onChange={(event) => setRenameValue(event.target.value)}
+                maxLength={200}
+                placeholder="My workflow"
+                autoFocus
+              />
+            </div>
+            {actionError && (
+              <p
+                role="alert"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+              >
+                {actionError}
+              </p>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRenameTarget(null)}
+                className="border-black/10 bg-white text-black hover:bg-white hover:border-black/40"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isRenaming || !renameValue.trim()}
+                className="border-transparent bg-[#F04D26] text-white hover:bg-[#F04D26] hover:border-white/50 disabled:opacity-60"
+              >
+                {isRenaming ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Workflow</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete “{deleteTarget?.title}”? All of
+              its executions will be removed as well. This action cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          {actionError && (
+            <p
+              role="alert"
+              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+            >
+              {actionError}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              className="border-black/10 bg-white text-black hover:bg-white hover:border-black/40"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleDelete()}
+              disabled={isDeleting}
+              className="border-transparent bg-[#F04D26] text-white hover:bg-[#F04D26] hover:border-white/50 disabled:opacity-60"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

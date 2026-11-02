@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import {
   ActivityIcon,
+  BotMessageSquareIcon,
   KeySquareIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -37,6 +38,7 @@ const NAV_ITEMS: { title: string; href: string; icon: LucideIcon }[] = [
   { title: "Dashboard", href: "/home", icon: LayoutDashboardIcon },
   { title: "Executions", href: "/home/executions", icon: ActivityIcon },
   { title: "Credentials", href: "/home/credentials", icon: KeySquareIcon },
+  { title: "AI Agent", href: "/home/agent", icon: BotMessageSquareIcon },
   { title: "Account", href: "/home/account", icon: UserRoundIcon },
 ]
 
